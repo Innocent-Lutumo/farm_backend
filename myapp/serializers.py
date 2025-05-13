@@ -5,6 +5,7 @@ from django.core.exceptions import ValidationError
 from django.core.validators import EmailValidator
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 
+
 class FarmImageSerializer(serializers.ModelSerializer):
     class Meta:
         model = FarmImage
@@ -32,7 +33,7 @@ class FarmRentTransactionSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = FarmRentTransaction
-        fields = ['id', 'farm', 'farm_id', 'full_name', 'residence', 'national_id', 'renter_phone', 'transaction_id', 'renter_email', 'rent_date']
+        fields = ['id', 'farm', 'farm_id', 'full_name', 'residence', 'national_id', 'renter_phone', 'status', 'transaction_id', 'renter_email', 'is_rented', 'rent_date']
 
     def validate_renter_email(self, value):
         if not value:
@@ -41,6 +42,7 @@ class FarmRentTransactionSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         farm = validated_data.pop('farm_id')
+        validated_data['is_rented'] = True  
         return FarmRentTransaction.objects.create(farm=farm, **validated_data)
 
 class FarmSaleTransactionSerializer(serializers.ModelSerializer):
@@ -49,7 +51,7 @@ class FarmSaleTransactionSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = FarmSaleTransaction
-        fields = ['id', 'farm', 'farm_id', 'full_name', 'address', 'contact_info', 'national_id', 'intended_use', 'buyer_email', 'status', 'transaction_id']
+        fields = ['id', 'farm', 'farm_id', 'full_name', 'address', 'contact_info', 'national_id', 'intended_use', 'buyer_email', 'is_rented', 'status', 'transaction_id']
 
     def validate_buyer_email(self, value):
         if not value:
@@ -81,16 +83,17 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
         })
         
         return data
-
-
+ 
 class RegisterSerializer(serializers.ModelSerializer):
+    sellerName = serializers.CharField(max_length=150, source='seller_name')
     username = serializers.CharField(max_length=150)
+    sellerResidence = serializers.CharField(max_length=150, source='seller_residence')
     password = serializers.CharField(write_only=True)
     confirmPassword = serializers.CharField(write_only=True)
 
     class Meta:
         model = User
-        fields = ['username', 'password', 'confirmPassword']
+        fields = ['sellerName', 'username', 'sellerResidence', 'password', 'confirmPassword']
 
     def validate(self, data):
         if User.objects.filter(username=data['username']).exists():
@@ -100,14 +103,19 @@ class RegisterSerializer(serializers.ModelSerializer):
         return data
 
     def create(self, validated_data):
+        seller_name = validated_data['seller_name']
+        seller_residence = validated_data['seller_residence']
         username = validated_data['username']
         password = validated_data['password']
 
         user = User.objects.create_user(
             username=username,
             password=password,
+            seller_name=seller_name,
+            seller_residence=seller_residence
         )
         return user
+
 
 
     
