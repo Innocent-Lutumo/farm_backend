@@ -6,14 +6,17 @@ from rest_framework import status
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.decorators import api_view, permission_classes
 from django.contrib.auth import authenticate
-from django.contrib.auth.models import User
+from django.contrib.auth.models import User, Group
+from django.contrib.auth import get_user_model
 from django.views.decorators.csrf import csrf_exempt
+from rest_framework.authtoken.models import Token
 from django.http import JsonResponse
 from django.core.mail import send_mail
 from django.conf import settings
-from rest_framework.decorators import api_view 
+from rest_framework.decorators import api_view, action
 from rest_framework import viewsets
 from rest_framework_simplejwt.authentication import JWTAuthentication
+from rest_framework import generics
 
 from .utils import verify_google_token
 from .serializers import (
@@ -35,30 +38,127 @@ import json
 from google.oauth2 import id_token
 from google.auth.transport.requests import Request
 
-
+# token generation view for sellers
 class CustomTokenObtainPairView(TokenObtainPairView):
     serializer_class = CustomTokenObtainPairSerializer
 
+# view to get the list of all sellers
+User = get_user_model()
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_sellers(request):
+    user = request.user
+    if not (user.is_superuser or user.groups.filter(name='Admin').exists()):
+        return Response({'error': 'User is not an admin.'}, status=status.HTTP_403_FORBIDDEN)
+    
+    sellers = User.objects.filter(groups__name='Seller')
+    if not sellers.exists():
+        return Response({'message': 'No sellers found.'}, status=status.HTTP_404_NOT_FOUND)
+    
+    serializer = RegisterSerializer(sellers, many=True)
+    return Response(serializer.data)
+
+@api_view(['GET', 'PUT', 'DELETE'])
+@permission_classes([IsAuthenticated])
+def seller_detail(request, pk):
+    """
+    Get, update or delete a specific seller.
+    """
+    user = request.user
+    if not (user.is_superuser or user.groups.filter(name='Admin').exists()):
+        return Response({'error': 'User is not an admin.'}, status=status.HTTP_403_FORBIDDEN)
+    
+    try:
+        seller = User.objects.get(pk=pk)
+        # Check if user is in Seller group
+        if not seller.groups.filter(name='Seller').exists():
+            return Response({'error': 'User is not a seller.'}, status=status.HTTP_400_BAD_REQUEST)
+    except User.DoesNotExist:
+        return Response({'error': 'Seller not found.'}, status=status.HTTP_404_NOT_FOUND)
+    
+    # GET request to retrieve seller details
+    if request.method == 'GET':
+        serializer = RegisterSerializer(seller)
+        return Response(serializer.data)
+    
+    # PUT request to update seller details
+    elif request.method == 'PUT':
+        serializer = RegisterSerializer(seller, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
+    # DELETE request to remove a seller
+    elif request.method == 'DELETE':
+        # Option 1: Complete deletion (use with caution)
+        # seller.delete()
+        
+        # Option 2: Safer option - remove from Seller group but keep the user
+        seller_group = seller.groups.get(name='Seller')
+        seller.groups.remove(seller_group)
+        
+        # Option 3: Deactivate the user instead of deleting
+        # seller.is_active = False
+        # seller.save()
+        
+        return Response({'message': 'Seller removed successfully.'}, status=status.HTTP_204_NO_CONTENT)
+
+# view controls admin login
+@api_view(['POST'])
+def admin_login(request):
+    username = request.data.get('username')
+    password = request.data.get('password')
+
+    if not username or not password:
+        return Response({'error': 'Please provide both username and password.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    user = authenticate(username=username, password=password)
+
+    if user is None:
+        return Response({'error': 'Invalid credentials.'}, status=status.HTTP_401_UNAUTHORIZED)
+
+    if not user.is_active:
+        return Response({'error': 'User account is inactive.'}, status=status.HTTP_403_FORBIDDEN)
+
+    if not (user.is_superuser or user.groups.filter(name='Admin').exists()):
+        return Response({'error': 'User is not an admin.'}, status=status.HTTP_403_FORBIDDEN)
+
+    refresh = RefreshToken.for_user(user)
+
+    return Response({
+        'access': str(refresh.access_token),
+        'refresh': str(refresh),
+        'username': user.username,
+        'email': user.email,
+        'is_superuser': user.is_superuser
+    })    
+
 # view for login
 class LoginView(APIView):
-
     def post(self, request):
         username = request.data.get("username")
         password = request.data.get("password")
 
         if not username or not password:
-            return Response({"error": "Username and password are required"}, status=400)
+            return Response({"error": "Username and password are required"}, status=status.HTTP_400_BAD_REQUEST)
 
         user = authenticate(request, username=username, password=password)
 
         if user is None:
-            return Response({"error": "Invalid credentials"}, status=401)
-        
+            return Response({"error": "Invalid credentials"}, status=status.HTTP_401_UNAUTHORIZED)
+
+        if not user.groups.filter(name='Seller').exists():
+            return Response({"error": "User is not a seller"}, status=status.HTTP_403_FORBIDDEN)
+
         refresh = RefreshToken.for_user(user)
+
         return Response({
-            "access": str(refresh.access),
-            "refresh": str(refresh)
-        })
+            "access": str(refresh.access_token),
+            "refresh": str(refresh),
+            "username": user.username,
+        }, status=status.HTTP_200_OK)
 
 # view for google login
 def verify_google_token(token):
@@ -74,7 +174,7 @@ def google_login_view(request):
         try:
 
             body = json.loads(request.body)
-            token = body.get('token')
+            token = body.get('access')
 
             if not token:
                 return JsonResponse({"error": "Token is missing"}, status=400)
@@ -110,11 +210,31 @@ def google_login_view(request):
 # view for registration
 class RegisterView(APIView):
     def post(self, request):
+        print("Received data:", request.data)  # Print the raw input data
+        
         serializer = RegisterSerializer(data=request.data)
+        
         if serializer.is_valid():
-            serializer.save()
-            return Response({"message": "User registered successfully"}, status=201)
-        return Response(serializer.errors, status=400)
+            print("Serializer is valid. Validated data:", serializer.validated_data)  # Print validated data
+            
+            user = serializer.save()
+
+            try:
+                seller_group = Group.objects.get(name='Seller')
+                user.groups.add(seller_group)
+            except Group.DoesNotExist:
+                print("Seller group does not exist.")  # Print error info
+                return Response(
+                    {"error": "Seller group does not exist. Please create it in the admin panel."},
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                )
+
+            print("User registered successfully:", user.username)  
+            return Response({"message": "User registered successfully as Seller"}, status=status.HTTP_201_CREATED)
+
+        print("Serializer errors:", serializer.errors) 
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
 
 # view for creating a transaction after click purchase or rent button
 @api_view(['POST'])
@@ -173,13 +293,62 @@ def get_sale_farms(request):
     serializer = FarmSaleSerializer(farms, many=True)
     return Response(serializer.data)
 
+# get only the validated farms
+@api_view(['GET'])
+def get_validated_sale_farms(request):
+    farms = FarmSale.objects.filter(is_validated=True, is_rejected=False)
+    serializer = FarmSaleSerializer(farms, many=True)
+    return Response(serializer.data)
+
 
 @api_view(['GET'])
 def get_rent_farms(request):
-    farm_type = request.GET.get('type')
-    farms = FarmRent.objects.filter(farm_type__iexact=farm_type) if farm_type else FarmRent.objects.all()
-    serializer = FarmRentSerializer(farms, many=True)
+    queryset = FarmRent.objects.all()
+    # Filter by location (case-insensitive match)
+    location = request.GET.get("location")
+    if location:
+        queryset = queryset.filter(location__icontains=location)
+    # Filter by exact or less-than-or-equal price
+    price = request.GET.get("price")
+    if price:
+        try:
+            queryset = queryset.filter(price__lte=price)
+        except ValueError:
+            pass 
+    # Filter by size (you may want exact match or partial match)
+    size = request.GET.get("size")
+    if size:
+        queryset = queryset.filter(size__icontains=size)
+    serializer = FarmRentSerializer(queryset, many=True)
     return Response(serializer.data)
+
+# get the validated farms for rent
+@api_view(['GET'])
+def get_validated_rent_farms(request):
+    queryset = FarmRent.objects.filter(is_validated=True, is_rejected=False)
+    location = request.GET.get("location")
+    if location:
+        queryset = queryset.filter(location__icontains=location)
+    price = request.GET.get("price")
+    if price:
+        try:
+            queryset = queryset.filter(price__lte=price)
+        except ValueError:
+            pass 
+    size = request.GET.get("size")
+    if size:
+        queryset = queryset.filter(size__icontains=size)
+    serializer = FarmRentSerializer(queryset, many=True)
+    return Response(serializer.data)
+
+
+class FarmSaleDetailAPIView(generics.RetrieveUpdateAPIView):
+    queryset = FarmSale.objects.all()
+    serializer_class = FarmSaleSerializer
+
+class FarmRentDetailAPIView(generics.RetrieveUpdateAPIView):
+    queryset = FarmRent.objects.all()
+    serializer_class = FarmRentSerializer
 
 # get the farm details on new page
 @api_view(['GET'])
@@ -201,30 +370,29 @@ def rent_farm_detail(request, id):
 
 # upload farm view for authenticated user
 class UploadFarmAPIView(APIView):
-
     authentication_classes = [JWTAuthentication]
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
-
-        print(f"User authenticated: {request.user.is_authenticated}")
-        print(f"User: {request.user}")
-
+        if not request.user.is_authenticated:
+            return Response({"error": "Authentication required"}, status=401)
 
         farm_type = request.data.get("farmType")
         images = request.FILES.getlist('images')
 
-        if not (3 <= len(images) <= 10):
-            return Response({"error": "Upload between 3 and 10 images."}, status=400)
+        if not (4 <= len(images) <= 10):
+            return Response({"error": "Upload between 4 and 10 images."}, status=400)
 
-        serializer = FarmSaleSerializer(data=request.data) if farm_type == "Sale" else (
-            FarmRentSerializer(data=request.data) if farm_type == "Rent" else None)
-
-        if not serializer:
+        if farm_type == "Sale":
+            serializer = FarmSaleSerializer(data=request.data)
+        elif farm_type == "Rent":
+            serializer = FarmRentSerializer(data=request.data)
+        else:
             return Response({"error": "Invalid farm type"}, status=400)
 
         if serializer.is_valid():
-            farm = serializer.save(user=request.user) 
+            farm = serializer.save(user=request.user)
+
             for image in images:
                 FarmImage.objects.create(
                     farm_sale=farm if farm_type == "Sale" else None,
@@ -288,6 +456,31 @@ class FarmDetailView(APIView):
         farm.delete()
         return Response(status=204)
 
+    def patch(self, request, farm_type, farm_id):
+
+        data = request.data
+
+        if farm_type == "rent":
+            transaction = FarmRentTransaction.objects.filter(farm_id=farm_id).first()
+            serializer_class = FarmRentTransactionSerializer
+        elif farm_type == "sale":
+            transaction = FarmSaleTransaction.objects.filter(farm_id=farm_id).first()
+            serializer_class = FarmSaleTransactionSerializer
+        else:
+            return Response({"error": "Invalid farm type"}, status=400)
+
+        if not transaction:
+            return Response({"error": "Transaction not found for this farm"}, status=404)
+
+        # Update validation fields
+        transaction.is_validated = data.get("is_validated", transaction.is_validated)
+        transaction.is_rejected = data.get("is_rejected", transaction.is_rejected)
+        transaction.admin_feedback = data.get("admin_feedback", transaction.admin_feedback)
+        transaction.save()
+
+        serializer = serializer_class(transaction)
+        return Response(serializer.data, status=200)
+
 # view to send transaction ID to the user email
 @api_view(['POST'])
 def send_transaction_email(request):
@@ -329,43 +522,7 @@ def send_transaction_email_rent(request):
         return Response({'error': f'Failed to send email: {str(e)}'}, status=500)
     
 
-@api_view(['PATCH'])
-def update_farm_rent_status(request, id):
-    """Update a farm's rental status"""
-    try:
-        farm = FarmRent.objects.get(pk=id)
-        farm.is_rented = request.data.get('is_rented', farm.is_rented)
-        farm.save()
-        serializer = FarmRentSerializer(farm)
-        return Response(serializer.data)
-    except FarmRent.DoesNotExist:
-        return Response({"error": "Farm not found"}, status=status.HTTP_404_NOT_FOUND)
-    except Exception as e:
-        return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-@api_view(['PATCH'])
-def update_farm_sale_status(request, id):
-    """Update a farm's sale status"""
-    try:
-        farm = FarmSale.objects.get(pk=id)
-        farm.is_sold = request.data.get('is_sold', False)
-        farm.save()
-        serializer = FarmSaleSerializer(farm)
-        return Response(serializer.data)
-    except FarmSale.DoesNotExist:
-        return Response({"error": "Farm not found"}, status=status.HTTP_404_NOT_FOUND)
-    except Exception as e:
-        return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-    
-@api_view(['GET'])
-def get_farm_transactions(request, farm_id):
-    """Get all transactions for a specific farm ID"""
-    try:
-        transactions = FarmRentTransaction.objects.filter(farm_id=farm_id)
-        serializer = FarmRentTransactionSerializer(transactions, many=True)
-        return Response(serializer.data)
-    except Exception as e:
-        return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 

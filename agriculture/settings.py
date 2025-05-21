@@ -43,6 +43,8 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'myapp',
+    'mypanel',
+    'seller',
     'graphene_django',
     'corsheaders',
     'rest_framework',
@@ -84,14 +86,21 @@ WSGI_APPLICATION = 'agriculture.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
+# DATABASES = {
+#     'default': {
+#         'ENGINE': 'django.db.backends.postgresql',
+#         'NAME': 'farmdb',
+#         'USER': 'postgres',
+#         'PASSWORD': 'myinnoc@2030',  
+#         'HOST': 'localhost',
+#         'PORT': '5432',
+#     }
+# }
+
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': 'farmdb',
-        'USER': 'postgres',
-        'PASSWORD': 'myinnoc@2030',  
-        'HOST': 'localhost',
-        'PORT': '5432',
+        'ENGINE': 'django.db.backends.sqlite3',
+        'NAME': BASE_DIR / 'db.sqlite3',
     }
 }
 
@@ -187,9 +196,9 @@ REST_FRAMEWORK = {
 
 }
 SIMPLE_JWT = {
-    'ACCESS_TOKEN_LIFETIME': timedelta(days=1),  # Token expires after 1 hour
-    'REFRESH_TOKEN_LIFETIME': timedelta(days=1),     # Refresh token expires after 1 day   
-    'AUTH_HEADER_TYPES': ('Bearer',),  # Authorization: Bearer <token>
+    'ACCESS_TOKEN_LIFETIME': timedelta(days=1), 
+    'REFRESH_TOKEN_LIFETIME': timedelta(days=1),     
+    'AUTH_HEADER_TYPES': ('Bearer',),  
     'ROTATE_REFRESH_TOKENS': True,
    
 }
