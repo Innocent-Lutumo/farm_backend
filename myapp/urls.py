@@ -23,6 +23,7 @@ urlpatterns = [
     path('google-login/', google_login_view, name='google-login'),
     path('farmsale/', views.get_sale_farms, name='get_farms'),
     path('farmsale/validated/', views.get_validated_sale_farms, name='get_farms'),
+    path('farmsale/<int:pk>/update_sold_status/', views.update_farm_sold_status, name='update-farm-sold-status'),
     path('farmsrent/', views.get_rent_farms, name='farms_rent'),
     path('farmsrent/validated/', views.get_validated_rent_farms, name='farms_rent'),
     path('farmsale/<int:pk>/', views.FarmSaleDetailAPIView.as_view(), name='farmsale-detail'),
@@ -37,6 +38,7 @@ urlpatterns = [
     path('send-transaction-email/', send_transaction_email, name='send_transaction_email'),
     path('send-transaction-email-rent/', send_transaction_email_rent, name='send_transaction_email_rent'),
     path('all-farms/<str:farm_type>/<int:farm_id>/', FarmDetailView.as_view(), name='farm_detail'),
+    path('download-contract/<int:farm_id>/', views.download_contract, name='download-contract'),
     path("", include(router.urls)),
 ]
 

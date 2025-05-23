@@ -44,7 +44,7 @@ class FarmSale(models.Model):
     phone = models.CharField(max_length=15)
     farm_type = models.CharField(max_length=4, default="Sale")
     is_sold = models.BooleanField(default=False)
-    farm_number = models.CharField(max_length=100, default="UNKNOWN")
+    farm_number = models.CharField(max_length=100, blank=True, null=True)
     passport = models.ImageField(upload_to='passports/', null=True, blank=True)
     ownership_certificate = models.FileField(upload_to='certificates/', null=True, blank=True)
     click_count = models.IntegerField(default=0)
@@ -71,7 +71,7 @@ class FarmRent(models.Model):
     farm_type = models.CharField(max_length=4, default="Rent")
     rent_duration = models.CharField(max_length=100, null=True, blank=True)
     is_rented = models.BooleanField(default=False)
-    farm_number = models.CharField(max_length=100, default="UNKNOWN")
+    farm_number = models.CharField(max_length=100, blank=True, null=True)
     passport = models.ImageField(upload_to='passports/', null=True, blank=True)
     ownership_certificate = models.FileField(upload_to='certificates/', null=True, blank=True)
     click_count = models.IntegerField(default=0)
@@ -102,7 +102,7 @@ class FarmImage(models.Model):
         related_name="images"
     )
     image = models.ImageField(upload_to='farm_images/')
-    uploaded_at = models.DateTimeField(null=True, blank=True)  # nullable, no auto_now_add
+    uploaded_at = models.DateTimeField(null=True, blank=True) 
 
     def __str__(self):
         if self.farm_sale:

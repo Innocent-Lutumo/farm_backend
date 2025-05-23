@@ -10,8 +10,10 @@ from django.contrib.auth.models import User, Group
 from django.contrib.auth import get_user_model
 from django.views.decorators.csrf import csrf_exempt
 from rest_framework.authtoken.models import Token
-from django.http import JsonResponse
+from django.http import JsonResponse, HttpResponse
+from django.shortcuts import get_object_or_404
 from django.core.mail import send_mail
+from django.db.models import Q
 from django.conf import settings
 from rest_framework.decorators import api_view, action
 from rest_framework import viewsets
@@ -35,6 +37,7 @@ from .models import (
 )
 
 import json
+import traceback
 from google.oauth2 import id_token
 from google.auth.transport.requests import Request
 
@@ -271,13 +274,14 @@ class TransactionViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         return FarmRentTransaction.objects.filter(farm__user=self.request.user)
     
-
+# view to get all transactions for sale history
 @api_view(['GET'])
 def sale_transactions(request):
     transactions = FarmSaleTransaction.objects.select_related('farm').all()
     serializer = FarmSaleTransactionSerializer(transactions, many=True)
     return Response(serializer.data)
 
+# view to get all transactions for sale history
 class SaleTransactionViewSet(viewsets.ModelViewSet):
     queryset = FarmSaleTransaction.objects.all() 
     serializer_class = FarmSaleTransactionSerializer
@@ -341,7 +345,7 @@ def get_validated_rent_farms(request):
     serializer = FarmRentSerializer(queryset, many=True)
     return Response(serializer.data)
 
-
+# view to provide endpoints such as edit, update and delete 
 class FarmSaleDetailAPIView(generics.RetrieveUpdateAPIView):
     queryset = FarmSale.objects.all()
     serializer_class = FarmSaleSerializer
@@ -521,8 +525,58 @@ def send_transaction_email_rent(request):
     except Exception as e:
         return Response({'error': f'Failed to send email: {str(e)}'}, status=500)
     
+def download_contract(request, farm_id):
+    """Download contract PDF"""
+    try:
+        farm = get_object_or_404(FarmRent, id=id)
 
+        # Example: Replace with real PDF generation
+        def generate_contract_pdf(farm):
+            return f"PDF content for farm {farm.farm_number}".encode('utf-8')
 
+        pdf_content = generate_contract_pdf(farm)
+
+        response = HttpResponse(pdf_content, content_type='application/pdf')
+        response['Content-Disposition'] = (
+            f'attachment; filename="Mkataba_wa_Kukodisha_Shamba_{farm.farm_number}.pdf"'
+        )
+
+        return response
+
+    except Exception as e:
+        # Print full traceback in console
+        print("Error occurred while generating PDF:")
+        traceback.print_exc()
+
+        return JsonResponse(
+            {"error": f"Hitilafu katika kutengeneza PDF: {str(e)}"},
+            status=500
+        )
+
+# controls deactivation after successful transaction id generation
+@api_view(['PATCH'])
+def update_farm_sold_status(request, pk):
+    """
+    Updates the 'is_sold' status of a specific farm.
+    Allows setting is_sold to both True (sold) and False (reactivated).
+    """
+    try:
+        farm = FarmSale.objects.get(pk=pk)
+    except FarmSale.DoesNotExist:
+        return Response(status=status.HTTP_404_NOT_FOUND)
+
+    # Ensure only 'is_sold' can be updated by this endpoint for security/clarity
+    if 'is_sold' not in request.data or len(request.data) > 1:
+        return Response(
+            {"detail": "Only the 'is_sold' field can be updated via this endpoint."},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    serializer = FarmSaleSerializer(farm, data=request.data, partial=True)
+    if serializer.is_valid():
+        serializer.save()
+        return Response(serializer.data)
+    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
 
