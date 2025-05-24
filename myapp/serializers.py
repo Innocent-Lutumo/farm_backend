@@ -3,6 +3,8 @@ from django.contrib.auth.models import User
 from .models import *  
 from django.core.exceptions import ValidationError
 from django.core.validators import EmailValidator
+import os
+import re
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 
 
@@ -13,34 +15,53 @@ class FarmImageSerializer(serializers.ModelSerializer):
 
 class FarmSaleSerializer(serializers.ModelSerializer):
     images = FarmImageSerializer(many=True, read_only=True)
+
     class Meta:
         model = FarmSale
-        fields = '__all__' 
+        fields = '__all__'
 
     def validate_passport(self, value):
-        # Validate file size (e.g., max 5MB)
-        max_size = 5 * 1024 * 1024  # 5 MB
+        # Validate max size (2MB for passport photo)
+        max_size = 1 * 1024 * 1024
         if value.size > max_size:
-            raise serializers.ValidationError("Passport file size must be <= 5MB")
+            raise serializers.ValidationError("Passport photo must be 1MB or smaller.")
 
-        # Validate file type: allow PDF or images
-        valid_mime_types = ['application/pdf', 'image/jpeg', 'image/png', 'image/jpg']
-        if value.content_type not in valid_mime_types:
-            raise serializers.ValidationError("Passport must be a PDF or image file")
+        # Validate file type
+        valid_mime_types = ['image/jpeg', 'image/png']
+        content_type = getattr(value, 'content_type', None)
+        if content_type not in valid_mime_types:
+            raise serializers.ValidationError("Passport must be a JPEG or PNG image.")
+
+        # Optional: Validate file extension
+        ext = os.path.splitext(value.name)[1].lower()
+        if ext not in ['.jpg', '.jpeg', '.png']:
+            raise serializers.ValidationError("Invalid passport file extension.")
 
         return value
 
     def validate_ownership_certificate(self, value):
-        max_size = 5 * 1024 * 1024  # 5 MB
+        # Validate max size (5MB for certificates)
+        max_size = 5 * 1024 * 1024
         if value.size > max_size:
-            raise serializers.ValidationError("Certificate file size must be <= 5MB")
+            raise serializers.ValidationError("Certificate file size must be 5MB or smaller.")
 
-        valid_mime_types = ['application/pdf', 'image/jpeg', 'image/png', 'image/jpg']
-        if value.content_type not in valid_mime_types:
-            raise serializers.ValidationError("Certificate must be a PDF or image file")
+        # Only allow PDF files
+        content_type = getattr(value, 'content_type', None)
+        if content_type != 'application/pdf':
+            raise serializers.ValidationError("Certificate must be a PDF file.")
+
+        ext = os.path.splitext(value.name)[1].lower()
+        if ext != '.pdf':
+            raise serializers.ValidationError("Certificate file must have a .pdf extension.")
 
         return value
 
+    def validate_farm_number(self, value):
+        # Must match pattern: digits-hyphen-letters (e.g., 45-sinza)
+        if not re.match(r'^\d+-[a-zA-Z]+$', value):
+            raise serializers.ValidationError("Farm number must be in the format '45-sinza'.")
+        return value
+    
 class FarmRentSerializer(serializers.ModelSerializer):
     images = FarmImageSerializer(many=True, read_only=True)
 

@@ -26,6 +26,7 @@ urlpatterns = [
     path('farmsale/<int:pk>/update_sold_status/', views.update_farm_sold_status, name='update-farm-sold-status'),
     path('farmsrent/', views.get_rent_farms, name='farms_rent'),
     path('farmsrent/validated/', views.get_validated_rent_farms, name='farms_rent'),
+    path('farmsrent/<int:pk>/update_rented_status/', views.update_farm_rented_status, name='update-farm-rented-status'),
     path('farmsale/<int:pk>/', views.FarmSaleDetailAPIView.as_view(), name='farmsale-detail'),
     path('farmsrent/<int:pk>/', views.FarmRentDetailAPIView.as_view(), name='farmsrent-detail'),
     path('farms/<int:id>/', views.sale_farm_detail, name='farm-detail'),

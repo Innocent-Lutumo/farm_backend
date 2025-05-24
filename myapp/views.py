@@ -290,14 +290,14 @@ class SaleTransactionViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         return FarmSaleTransaction.objects.filter(farm__user=self.request.user)
 
-# get the farms lists for sale and rent
+# get the farms lists for sale by admin & sellers
 @api_view(['GET'])
 def get_sale_farms(request):
     farms = FarmSale.objects.all()
     serializer = FarmSaleSerializer(farms, many=True)
     return Response(serializer.data)
 
-# get only the validated farms
+# get only the validated farms by buyers & renters
 @api_view(['GET'])
 def get_validated_sale_farms(request):
     farms = FarmSale.objects.filter(is_validated=True, is_rejected=False)
@@ -308,18 +308,15 @@ def get_validated_sale_farms(request):
 @api_view(['GET'])
 def get_rent_farms(request):
     queryset = FarmRent.objects.all()
-    # Filter by location (case-insensitive match)
     location = request.GET.get("location")
     if location:
         queryset = queryset.filter(location__icontains=location)
-    # Filter by exact or less-than-or-equal price
     price = request.GET.get("price")
     if price:
         try:
             queryset = queryset.filter(price__lte=price)
         except ValueError:
             pass 
-    # Filter by size (you may want exact match or partial match)
     size = request.GET.get("size")
     if size:
         queryset = queryset.filter(size__icontains=size)
@@ -476,7 +473,6 @@ class FarmDetailView(APIView):
         if not transaction:
             return Response({"error": "Transaction not found for this farm"}, status=404)
 
-        # Update validation fields
         transaction.is_validated = data.get("is_validated", transaction.is_validated)
         transaction.is_rejected = data.get("is_rejected", transaction.is_rejected)
         transaction.admin_feedback = data.get("admin_feedback", transaction.admin_feedback)
@@ -530,7 +526,6 @@ def download_contract(request, farm_id):
     try:
         farm = get_object_or_404(FarmRent, id=id)
 
-        # Example: Replace with real PDF generation
         def generate_contract_pdf(farm):
             return f"PDF content for farm {farm.farm_number}".encode('utf-8')
 
@@ -544,7 +539,6 @@ def download_contract(request, farm_id):
         return response
 
     except Exception as e:
-        # Print full traceback in console
         print("Error occurred while generating PDF:")
         traceback.print_exc()
 
@@ -556,16 +550,12 @@ def download_contract(request, farm_id):
 # controls deactivation after successful transaction id generation
 @api_view(['PATCH'])
 def update_farm_sold_status(request, pk):
-    """
-    Updates the 'is_sold' status of a specific farm.
-    Allows setting is_sold to both True (sold) and False (reactivated).
-    """
+
     try:
         farm = FarmSale.objects.get(pk=pk)
     except FarmSale.DoesNotExist:
         return Response(status=status.HTTP_404_NOT_FOUND)
 
-    # Ensure only 'is_sold' can be updated by this endpoint for security/clarity
     if 'is_sold' not in request.data or len(request.data) > 1:
         return Response(
             {"detail": "Only the 'is_sold' field can be updated via this endpoint."},
@@ -578,5 +568,26 @@ def update_farm_sold_status(request, pk):
         return Response(serializer.data)
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
+
+
+@api_view(['PATCH'])
+def update_farm_rented_status(request, pk):
+    try:
+        farm = FarmRent.objects.get(pk=pk)
+    except FarmRent.DoesNotExist:
+        return Response(status=status.HTTP_404_NOT_FOUND)
+
+    # This ensures only 'is_rented' can be updated via this endpoint
+    if 'is_rented' not in request.data or len(request.data) > 1:
+        return Response(
+            {"detail": "Only the 'is_rented' field can be updated via this endpoint."},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    serializer = FarmRentSerializer(farm, data=request.data, partial=True)
+    if serializer.is_valid():
+        serializer.save()
+        return Response(serializer.data)
+    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 

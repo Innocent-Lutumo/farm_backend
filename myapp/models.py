@@ -44,9 +44,9 @@ class FarmSale(models.Model):
     phone = models.CharField(max_length=15)
     farm_type = models.CharField(max_length=4, default="Sale")
     is_sold = models.BooleanField(default=False)
-    farm_number = models.CharField(max_length=100, blank=True, null=True)
-    passport = models.ImageField(upload_to='passports/', null=True, blank=True)
-    ownership_certificate = models.FileField(upload_to='certificates/', null=True, blank=True)
+    farm_number = models.CharField(max_length=100, blank=False, default="NOT GIVEN") 
+    passport = models.ImageField(upload_to='passports/', blank=False, default="UNKNOWN")  
+    ownership_certificate = models.FileField(upload_to='certificates/', blank=False, default='N/A') 
     click_count = models.IntegerField(default=0)
     
     # Validation fields
@@ -71,9 +71,9 @@ class FarmRent(models.Model):
     farm_type = models.CharField(max_length=4, default="Rent")
     rent_duration = models.CharField(max_length=100, null=True, blank=True)
     is_rented = models.BooleanField(default=False)
-    farm_number = models.CharField(max_length=100, blank=True, null=True)
-    passport = models.ImageField(upload_to='passports/', null=True, blank=True)
-    ownership_certificate = models.FileField(upload_to='certificates/', null=True, blank=True)
+    farm_number = models.CharField(max_length=100, blank=False, default="NOT GIVEN")
+    passport = models.ImageField(upload_to='passports/', blank=False, default="UNKNOWN")  
+    ownership_certificate = models.FileField(upload_to='certificates/', blank=False, default='N/A') 
     click_count = models.IntegerField(default=0)
     
     # Validation fields
