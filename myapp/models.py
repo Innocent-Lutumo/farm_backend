@@ -44,8 +44,8 @@ class FarmSale(models.Model):
     phone = models.CharField(max_length=15)
     farm_type = models.CharField(max_length=4, default="Sale")
     is_sold = models.BooleanField(default=False)
-    farm_number = models.CharField(max_length=100, blank=False, default="NOT GIVEN") 
-    passport = models.ImageField(upload_to='passports/', blank=False, default="UNKNOWN")  
+    farm_number = models.CharField(max_length=100, blank=False, default='N/A') 
+    passport = models.ImageField(upload_to='passports/', blank=False, default='N/A')  
     ownership_certificate = models.FileField(upload_to='certificates/', blank=False, default='N/A') 
     click_count = models.IntegerField(default=0)
     
@@ -57,7 +57,7 @@ class FarmSale(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
     
     def __str__(self):
-        return f"Farm for Sale - {self.location}"
+        return f"Farm in {self.location} by {self.user.username}"
 
 class FarmRent(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE, default=get_default_user)
@@ -71,8 +71,8 @@ class FarmRent(models.Model):
     farm_type = models.CharField(max_length=4, default="Rent")
     rent_duration = models.CharField(max_length=100, null=True, blank=True)
     is_rented = models.BooleanField(default=False)
-    farm_number = models.CharField(max_length=100, blank=False, default="NOT GIVEN")
-    passport = models.ImageField(upload_to='passports/', blank=False, default="UNKNOWN")  
+    farm_number = models.CharField(max_length=100, blank=False, default='N/A')
+    passport = models.ImageField(upload_to='passports/', blank=False, default='N/A')  
     ownership_certificate = models.FileField(upload_to='certificates/', blank=False, default='N/A') 
     click_count = models.IntegerField(default=0)
     
@@ -84,7 +84,7 @@ class FarmRent(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
     
     def __str__(self):
-        return f"Farm for Rent - {self.location}"
+        return f"Farm in {self.location} by {self.user.username}"
 
 class FarmImage(models.Model):
     farm_sale = models.ForeignKey(

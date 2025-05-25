@@ -39,7 +39,7 @@ urlpatterns = [
     path('send-transaction-email/', send_transaction_email, name='send_transaction_email'),
     path('send-transaction-email-rent/', send_transaction_email_rent, name='send_transaction_email_rent'),
     path('all-farms/<str:farm_type>/<int:farm_id>/', FarmDetailView.as_view(), name='farm_detail'),
-    path('download-contract/<int:farm_id>/', views.download_contract, name='download-contract'),
+    path('download-contract/<int:pk>/', DownloadContractPDFView.as_view(), name='download_contract_pdf'),
     path("", include(router.urls)),
 ]
 

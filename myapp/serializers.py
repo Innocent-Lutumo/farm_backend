@@ -15,81 +15,122 @@ class FarmImageSerializer(serializers.ModelSerializer):
 
 class FarmSaleSerializer(serializers.ModelSerializer):
     images = FarmImageSerializer(many=True, read_only=True)
+    username = serializers.CharField(source='user.username', read_only=True)
+    farm_number = serializers.CharField(allow_blank=True, required=False)
+    ownership_certificate = serializers.FileField(
+        use_url=True,
+        required=False,
+        allow_null=True
+    )
 
     class Meta:
         model = FarmSale
         fields = '__all__'
 
+    # Custom display logic for farm number
+    def to_representation(self, instance):
+        ret = super().to_representation(instance)
+        farm_num = ret.get('farm_number', '')
+        if not farm_num or farm_num.strip().upper() == "UNKNOWN":
+            ret['farm_number'] = "Not provided"
+        return ret
+
+    # Validate passport image (JPEG or PNG, max 1MB)
     def validate_passport(self, value):
-        # Validate max size (2MB for passport photo)
-        max_size = 1 * 1024 * 1024
+        max_size = 3 * 1024 * 1024  # 1MB
+        valid_mime_types = ['image/jpeg', 'image/png']
+        valid_extensions = ['.jpg', '.jpeg', '.png']
+
+        content_type = getattr(value, 'content_type', '').lower()
+        extension = os.path.splitext(value.name)[1].lower()
+
         if value.size > max_size:
             raise serializers.ValidationError("Passport photo must be 1MB or smaller.")
-
-        # Validate file type
-        valid_mime_types = ['image/jpeg', 'image/png']
-        content_type = getattr(value, 'content_type', None)
         if content_type not in valid_mime_types:
             raise serializers.ValidationError("Passport must be a JPEG or PNG image.")
-
-        # Optional: Validate file extension
-        ext = os.path.splitext(value.name)[1].lower()
-        if ext not in ['.jpg', '.jpeg', '.png']:
+        if extension not in valid_extensions:
             raise serializers.ValidationError("Invalid passport file extension.")
 
         return value
 
+    # Validate certificate (image or PDF, max 5MB)
     def validate_ownership_certificate(self, value):
-        # Validate max size (5MB for certificates)
-        max_size = 5 * 1024 * 1024
+        if not value:
+            return value  # Allow empty if field is optional
+
+        max_size = 5 * 1024 * 1024  # 5MB
+        valid_mime_types = ['application/pdf', 'image/jpeg', 'image/png']
+        valid_extensions = ['.pdf', '.jpg', '.jpeg', '.png']
+
+        content_type = getattr(value, 'content_type', '').lower()
+        extension = os.path.splitext(value.name)[1].lower()
+
         if value.size > max_size:
             raise serializers.ValidationError("Certificate file size must be 5MB or smaller.")
-
-        # Only allow PDF files
-        content_type = getattr(value, 'content_type', None)
-        if content_type != 'application/pdf':
-            raise serializers.ValidationError("Certificate must be a PDF file.")
-
-        ext = os.path.splitext(value.name)[1].lower()
-        if ext != '.pdf':
-            raise serializers.ValidationError("Certificate file must have a .pdf extension.")
+        if content_type not in valid_mime_types:
+            raise serializers.ValidationError("Certificate must be a PDF or image file (PDF, JPG, PNG).")
+        if extension not in valid_extensions:
+            raise serializers.ValidationError("Certificate file extension must be one of: .pdf, .jpg, .jpeg, .png")
 
         return value
 
+    # Validate farm number format (e.g., 45-sinza)
     def validate_farm_number(self, value):
-        # Must match pattern: digits-hyphen-letters (e.g., 45-sinza)
         if not re.match(r'^\d+-[a-zA-Z]+$', value):
             raise serializers.ValidationError("Farm number must be in the format '45-sinza'.")
         return value
     
 class FarmRentSerializer(serializers.ModelSerializer):
     images = FarmImageSerializer(many=True, read_only=True)
+    username = serializers.CharField(source='user.username', read_only=True)
+    farm_number = serializers.CharField(allow_blank=True, required=False)
+    ownership_certificate = serializers.FileField(use_url=True)
 
     class Meta:
         model = FarmRent
-        fields = '__all__' 
+        fields = '__all__'
 
+    # Handle display for 'farm_number'
+    def to_representation(self, instance):
+        ret = super().to_representation(instance)
+        farm_num = ret.get('farm_number', '')
+        if not farm_num or farm_num.strip().upper() == "UNKNOWN":
+            ret['farm_number'] = "Not provided"
+        return ret
+
+    # Validate passport (image or PDF, max 5MB)
     def validate_passport(self, value):
-        # Validate file size (e.g., max 5MB)
-        max_size = 5 * 1024 * 1024  # 5 MB
-        if value.size > max_size:
-            raise serializers.ValidationError("Passport file size must be <= 5MB")
+        max_size = 5 * 1024 * 1024  # 5MB
+        valid_mime_types = ['application/pdf', 'image/jpeg', 'image/png']
+        valid_extensions = ['.pdf', '.jpg', '.jpeg', '.png']
 
-        # Validate file type: allow PDF or images
-        valid_mime_types = ['application/pdf', 'image/jpeg', 'image/png', 'image/jpg']
-        if value.content_type not in valid_mime_types:
-            raise serializers.ValidationError("Passport must be a PDF or image file")
+        content_type = getattr(value, 'content_type', '').lower()
+        extension = os.path.splitext(value.name)[1].lower()
+
+        if value.size > max_size:
+            raise serializers.ValidationError("Passport file size must be 5MB or smaller.")
+        if content_type not in valid_mime_types:
+            raise serializers.ValidationError("Passport must be a PDF or image file.")
+        if extension not in valid_extensions:
+            raise serializers.ValidationError("Invalid passport file extension.")
 
         return value
 
+    # Validate certificate (image or PDF, max 5MB)
     def validate_ownership_certificate(self, value):
-        max_size = 5 * 1024 * 1024  # 5 MB
-        if value.size > max_size:
-            raise serializers.ValidationError("Certificate file size must be <= 5MB")
+        max_size = 5 * 1024 * 1024  # 5MB
+        valid_mime_types = ['application/pdf', 'image/jpeg', 'image/png']
+        valid_extensions = ['.pdf', '.jpg', '.jpeg', '.png']
 
-        valid_mime_types = ['application/pdf', 'image/jpeg', 'image/png', 'image/jpg']
-        if value.content_type not in valid_mime_types:
-            raise serializers.ValidationError("Certificate must be a PDF or image file")
+        content_type = getattr(value, 'content_type', '').lower()
+        extension = os.path.splitext(value.name)[1].lower()
+
+        if value.size > max_size:
+            raise serializers.ValidationError("Certificate file size must be 5MB or smaller.")
+        if content_type not in valid_mime_types:
+            raise serializers.ValidationError("Certificate must be a PDF or image file.")
+        if extension not in valid_extensions:
+            raise serializers.ValidationError("Invalid certificate file extension.")
 
         return value
 
@@ -162,9 +203,12 @@ class RegisterSerializer(serializers.ModelSerializer):
     
     class Meta:
         model = User
-        fields = ['seller_name', 'username', 'seller_residence', 'password', 'confirmPassword']
-    
+        # Include your new fields directly in Meta.fields
+        fields = ['id', 'seller_name', 'username', 'seller_residence', 'password', 'confirmPassword']
+        extra_kwargs = {'password': {'write_only': True}, 'confirmPassword': {'write_only': True}} # Good practice
+
     def validate(self, data):
+        # Your existing validation logic
         if User.objects.filter(username=data['username']).exists():
             raise serializers.ValidationError("Username already exists.")
         if data['password'] != data['confirmPassword']:
@@ -173,27 +217,40 @@ class RegisterSerializer(serializers.ModelSerializer):
     
     def create(self, validated_data):
         validated_data.pop('confirmPassword', None)
-
+        
+        # Assign directly to the new model fields
         seller_name = validated_data.pop('seller_name')
         seller_residence = validated_data.pop('seller_residence')
-        user = User.objects.create_user(**validated_data)
-        user.first_name = seller_name
-        user.save()
+        
+        # Use create_user to handle password hashing
+        user = User.objects.create_user(**validated_data) 
+        
+        # Now assign to the custom fields on your User model
+        user.seller_name = seller_name
+        user.seller_residence = seller_residence
+        user.save() # Save the user after setting the custom fields
+        
         return user
-   
+    
     def update(self, instance, validated_data):
         validated_data.pop('confirmPassword', None)
+
+        # Update custom fields if provided
         if 'seller_name' in validated_data:
-            instance.first_name = validated_data.pop('seller_name')
-       
+            instance.seller_name = validated_data.pop('seller_name')
+        
+        if 'seller_residence' in validated_data:
+            instance.seller_residence = validated_data.pop('seller_residence')
+        
+        # Update username if provided
         if 'username' in validated_data:
             instance.username = validated_data.pop('username')
         
+        # Update password if provided
         if 'password' in validated_data:
             instance.set_password(validated_data.pop('password'))
-        instance.save()
-        if 'seller_residence' in validated_data:
-            seller_residence = validated_data.pop('seller_residence')
+            
+        instance.save() # Save changes to the instance
         return instance
     
 
