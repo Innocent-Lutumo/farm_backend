@@ -46,7 +46,7 @@ class FarmSale(models.Model):
     is_sold = models.BooleanField(default=False)
     farm_number = models.CharField(max_length=100, blank=False, default='N/A') 
     passport = models.ImageField(upload_to='passports/', blank=False, default='N/A')  
-    ownership_certificate = models.FileField(upload_to='certificates/', blank=False, default='N/A') 
+    ownership_certificate = models.ImageField(upload_to='certificates/', blank=True, null=True) 
     click_count = models.IntegerField(default=0)
     
     # Validation fields
@@ -73,7 +73,7 @@ class FarmRent(models.Model):
     is_rented = models.BooleanField(default=False)
     farm_number = models.CharField(max_length=100, blank=False, default='N/A')
     passport = models.ImageField(upload_to='passports/', blank=False, default='N/A')  
-    ownership_certificate = models.FileField(upload_to='certificates/', blank=False, default='N/A') 
+    ownership_certificate = models.ImageField(upload_to='certificates/', blank=True, null=True) 
     click_count = models.IntegerField(default=0)
     
     # Validation fields

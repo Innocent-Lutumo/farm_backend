@@ -13,10 +13,18 @@ class FarmImageSerializer(serializers.ModelSerializer):
         model = FarmImage
         fields = ['image']
 
+
 class FarmSaleSerializer(serializers.ModelSerializer):
     images = FarmImageSerializer(many=True, read_only=True)
     username = serializers.CharField(source='user.username', read_only=True)
     farm_number = serializers.CharField(allow_blank=True, required=False)
+    
+    passport = serializers.FileField(
+        use_url=True,
+        required=False,
+        allow_null=True
+    )
+
     ownership_certificate = serializers.FileField(
         use_url=True,
         required=False,
@@ -27,7 +35,6 @@ class FarmSaleSerializer(serializers.ModelSerializer):
         model = FarmSale
         fields = '__all__'
 
-    # Custom display logic for farm number
     def to_representation(self, instance):
         ret = super().to_representation(instance)
         farm_num = ret.get('farm_number', '')
@@ -35,9 +42,11 @@ class FarmSaleSerializer(serializers.ModelSerializer):
             ret['farm_number'] = "Not provided"
         return ret
 
-    # Validate passport image (JPEG or PNG, max 1MB)
     def validate_passport(self, value):
-        max_size = 3 * 1024 * 1024  # 1MB
+        if not value:
+            return value  # Skip if optional and not provided
+
+        max_size = 3 * 1024 * 1024  # 3MB
         valid_mime_types = ['image/jpeg', 'image/png']
         valid_extensions = ['.jpg', '.jpeg', '.png']
 
@@ -45,18 +54,17 @@ class FarmSaleSerializer(serializers.ModelSerializer):
         extension = os.path.splitext(value.name)[1].lower()
 
         if value.size > max_size:
-            raise serializers.ValidationError("Passport photo must be 1MB or smaller.")
+            raise serializers.ValidationError("Passport photo must be 3MB or smaller.")
         if content_type not in valid_mime_types:
             raise serializers.ValidationError("Passport must be a JPEG or PNG image.")
         if extension not in valid_extensions:
-            raise serializers.ValidationError("Invalid passport file extension.")
+            raise serializers.ValidationError("Invalid passport file extension. Allowed: .jpg, .jpeg, .png")
 
         return value
 
-    # Validate certificate (image or PDF, max 5MB)
     def validate_ownership_certificate(self, value):
         if not value:
-            return value  # Allow empty if field is optional
+            return value  # Skip if optional and not provided
 
         max_size = 5 * 1024 * 1024  # 5MB
         valid_mime_types = ['application/pdf', 'image/jpeg', 'image/png']
@@ -84,13 +92,22 @@ class FarmRentSerializer(serializers.ModelSerializer):
     images = FarmImageSerializer(many=True, read_only=True)
     username = serializers.CharField(source='user.username', read_only=True)
     farm_number = serializers.CharField(allow_blank=True, required=False)
-    ownership_certificate = serializers.FileField(use_url=True)
+    
+    passport = serializers.FileField(
+        use_url=True,
+        required=False,
+        allow_null=True
+    )
+    ownership_certificate = serializers.FileField(
+        use_url=True,
+        required=False,
+        allow_null=True
+    )
 
     class Meta:
         model = FarmRent
         fields = '__all__'
 
-    # Handle display for 'farm_number'
     def to_representation(self, instance):
         ret = super().to_representation(instance)
         farm_num = ret.get('farm_number', '')
@@ -98,8 +115,10 @@ class FarmRentSerializer(serializers.ModelSerializer):
             ret['farm_number'] = "Not provided"
         return ret
 
-    # Validate passport (image or PDF, max 5MB)
     def validate_passport(self, value):
+        if not value:
+            return value  # Optional: skip validation if not provided
+
         max_size = 5 * 1024 * 1024  # 5MB
         valid_mime_types = ['application/pdf', 'image/jpeg', 'image/png']
         valid_extensions = ['.pdf', '.jpg', '.jpeg', '.png']
@@ -112,12 +131,14 @@ class FarmRentSerializer(serializers.ModelSerializer):
         if content_type not in valid_mime_types:
             raise serializers.ValidationError("Passport must be a PDF or image file.")
         if extension not in valid_extensions:
-            raise serializers.ValidationError("Invalid passport file extension.")
+            raise serializers.ValidationError("Invalid passport file extension. Allowed: .pdf, .jpg, .jpeg, .png")
 
         return value
 
-    # Validate certificate (image or PDF, max 5MB)
     def validate_ownership_certificate(self, value):
+        if not value:
+            return value  
+
         max_size = 5 * 1024 * 1024  # 5MB
         valid_mime_types = ['application/pdf', 'image/jpeg', 'image/png']
         valid_extensions = ['.pdf', '.jpg', '.jpeg', '.png']
@@ -130,7 +151,7 @@ class FarmRentSerializer(serializers.ModelSerializer):
         if content_type not in valid_mime_types:
             raise serializers.ValidationError("Certificate must be a PDF or image file.")
         if extension not in valid_extensions:
-            raise serializers.ValidationError("Invalid certificate file extension.")
+            raise serializers.ValidationError("Invalid certificate file extension. Allowed: .pdf, .jpg, .jpeg, .png")
 
         return value
 

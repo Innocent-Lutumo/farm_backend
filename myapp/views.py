@@ -59,8 +59,18 @@ def get_sellers(request):
     user = request.user
     if not (user.is_superuser or user.groups.filter(name='Admin').exists()):
         return Response({'error': 'User is not an admin.'}, status=status.HTTP_403_FORBIDDEN)
+
+    seller_group = Group.objects.get(name='Seller')
+    sellers = User.objects.filter(groups=seller_group)
     
-    # Get all users in the Seller group
+    serializer = RegisterSerializer(sellers, many=True)
+    return Response(serializer.data)
+
+# unprotected version for get sellers
+User = get_user_model()
+
+@api_view(['GET'])
+def get_sellers_unprotected(request):
     seller_group = Group.objects.get(name='Seller')
     sellers = User.objects.filter(groups=seller_group)
     
@@ -386,6 +396,7 @@ class UploadFarmAPIView(APIView):
 
         if serializer.is_valid():
             farm = serializer.save(user=request.user)
+            print(farm)
 
             for image in images:
                 FarmImage.objects.create(
@@ -415,6 +426,8 @@ class AllFarmsView(APIView):
 
 # view to control edit and delete of the farm for all uploaded farms
 class FarmDetailView(APIView):
+    permission_classes = [IsAuthenticated]  
+    
     def get_farm(self, farm_id, farm_type):
         if farm_type == "sale":
             farm = FarmSale.objects.filter(id=farm_id).first()
@@ -423,37 +436,48 @@ class FarmDetailView(APIView):
             farm = FarmRent.objects.filter(id=farm_id).first()
             return farm, FarmRentSerializer
         return None, None
-
+    
     def get(self, request, farm_type, farm_id):
         farm, serializer_class = self.get_farm(farm_id, farm_type)
         if not farm:
-            return Response({"error": "Farm not found"}, status=404)
-        serializer = serializer_class(farm)
-        return Response(serializer.data)
-
+            return Response({"error": "Farm not found"}, status=status.HTTP_404_NOT_FOUND)
+        
+        # Check if user owns this farm (optional security check)
+        # if hasattr(farm, 'email') and farm.email != request.user.email:
+        #     return Response({"error": "Permission denied"}, status=status.HTTP_403_FORBIDDEN)
+            
+        # serializer = serializer_class(farm)
+        # return Response(serializer.data)
+    
     def put(self, request, farm_type, farm_id):
         farm, serializer_class = self.get_farm(farm_id, farm_type)
         if not farm:
-            return Response({"error": "Farm not found"}, status=404)
-
+            return Response({"error": "Farm not found"}, status=status.HTTP_404_NOT_FOUND)
+        
+        # Check if user owns this farm
+        # if hasattr(farm, 'email') and farm.email != request.user.email:
+        #     return Response({"error": "Permission denied"}, status=status.HTTP_403_FORBIDDEN)
+        
         serializer = serializer_class(farm, data=request.data, partial=True)
         if serializer.is_valid():
             serializer.save()
-            return Response(serializer.data)
-        return Response(serializer.errors, status=400)
-
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
     def delete(self, request, farm_type, farm_id):
-        farm, _ = self.get_farm(farm_id, farm_type)
+        farm, _ = self.get_farm(farm_id, farm_type) 
         if not farm:
-            return Response({"error": "Farm not found"}, status=404)
-
+            return Response({"error": "Farm not found"}, status=status.HTTP_404_NOT_FOUND)
+        
+        # Check if user owns this farm
+        # if hasattr(farm, 'email') and farm.email != request.user.email:
+        #     return Response({"error": "Permission denied"}, status=status.HTTP_403_FORBIDDEN)
+            
         farm.delete()
-        return Response(status=204)
-
+        return Response({"message": "Farm deleted successfully"}, status=status.HTTP_204_NO_CONTENT)
+    
     def patch(self, request, farm_type, farm_id):
-
         data = request.data
-
         if farm_type == "rent":
             transaction = FarmRentTransaction.objects.filter(farm_id=farm_id).first()
             serializer_class = FarmRentTransactionSerializer
@@ -461,18 +485,18 @@ class FarmDetailView(APIView):
             transaction = FarmSaleTransaction.objects.filter(farm_id=farm_id).first()
             serializer_class = FarmSaleTransactionSerializer
         else:
-            return Response({"error": "Invalid farm type"}, status=400)
-
+            return Response({"error": "Invalid farm type"}, status=status.HTTP_400_BAD_REQUEST)
+        
         if not transaction:
-            return Response({"error": "Transaction not found for this farm"}, status=404)
-
+            return Response({"error": "Transaction not found for this farm"}, status=status.HTTP_404_NOT_FOUND)
+        
         transaction.is_validated = data.get("is_validated", transaction.is_validated)
         transaction.is_rejected = data.get("is_rejected", transaction.is_rejected)
         transaction.admin_feedback = data.get("admin_feedback", transaction.admin_feedback)
         transaction.save()
-
+        
         serializer = serializer_class(transaction)
-        return Response(serializer.data, status=200)
+        return Response(serializer.data, status=status.HTTP_200_OK)
 
 # view to send transaction ID to the user email
 @api_view(['POST'])

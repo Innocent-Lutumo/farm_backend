@@ -16,6 +16,7 @@ urlpatterns = [
     path('admin-login/', views.admin_login, name='admin-login'),
     path('register/', RegisterView.as_view(), name='register'),
     path('admin-sellers/', get_sellers, name='get_sellers'),
+    path('admin-sellers_list/', get_sellers_unprotected, name='get_sellers_unprotected'),
     path('admin-sellers/<int:pk>/', views.seller_detail, name='seller_detail'),
     path('UploadFarm/', UploadFarmAPIView.as_view(), name='Upload_farm'),
     path('token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
