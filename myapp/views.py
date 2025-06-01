@@ -172,42 +172,41 @@ def verify_google_token(token):
     except ValueError:
         return None
 
-@csrf_exempt 
+@csrf_exempt
 def google_login_view(request):
     if request.method == 'POST':
         try:
-
             body = json.loads(request.body)
             token = body.get('access')
-
             if not token:
                 return JsonResponse({"error": "Token is missing"}, status=400)
-
+            
             user_info = verify_google_token(token)
             if not user_info or 'email' not in user_info:
                 return JsonResponse({"error": "Invalid token or user info"}, status=400)
-
+            
             user, created = User.objects.get_or_create(
                 username=user_info['email'],
                 defaults={
                     'first_name': user_info.get('given_name', ''),
-                    'last_name': user_info.get('family_name', '')
+                    'last_name': user_info.get('family_name', ''),
+                    'email': user_info['email']  
                 }
             )
-
+            
+            # FIX: Changed from 'refresh = refresh.for_user(user)' to 'refresh = RefreshToken.for_user(user)'
             refresh = RefreshToken.for_user(user)
+            
             return JsonResponse({
                 "message": "Google login successful",
                 "user_info": user_info,
-                "access": str(refresh.access),
+                "access": str(refresh.access_token),  
                 "refresh": str(refresh)
             })
-
         except json.JSONDecodeError:
             return JsonResponse({"error": "Invalid JSON"}, status=400)
         except Exception as e:
             return JsonResponse({"error": str(e)}, status=500)
-
     return JsonResponse({"error": "Invalid request method"}, status=405)
 
 
