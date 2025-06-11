@@ -186,7 +186,9 @@ EMAIL_HOST = 'smtp.gmail.com'
 EMAIL_PORT = 587
 EMAIL_USE_TLS = True
 EMAIL_HOST_USER = 'innocrng23@gmail.com'
-EMAIL_HOST_PASSWORD = 'ibup wumm yfbi aaxt'
+EMAIL_HOST_PASSWORD = 'ibupwummyfbiaaxt'
+FRONTEND_URL = 'http://localhost:3000'  
+BACKEND_URL = 'http://localhost:8000'  
 
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [

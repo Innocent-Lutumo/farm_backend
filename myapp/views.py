@@ -425,8 +425,8 @@ class AllFarmsView(APIView):
 
 # view to control edit and delete of the farm for all uploaded farms
 class FarmDetailView(APIView):
-    permission_classes = [IsAuthenticated]  
-    
+    permission_classes = [IsAuthenticated]
+
     def get_farm(self, farm_id, farm_type):
         if farm_type == "sale":
             farm = FarmSale.objects.filter(id=farm_id).first()
@@ -435,31 +435,62 @@ class FarmDetailView(APIView):
             farm = FarmRent.objects.filter(id=farm_id).first()
             return farm, FarmRentSerializer
         return None, None
-    
+
     def get(self, request, farm_type, farm_id):
         farm, serializer_class = self.get_farm(farm_id, farm_type)
         if not farm:
             return Response({"error": "Farm not found"}, status=status.HTTP_404_NOT_FOUND)
-        
-        # Check if user owns this farm (optional security check)
-        # if hasattr(farm, 'email') and farm.email != request.user.email:
-        #     return Response({"error": "Permission denied"}, status=status.HTTP_403_FORBIDDEN)
-            
-        # serializer = serializer_class(farm)
-        # return Response(serializer.data)
-    
+        serializer = serializer_class(farm, context={'request': request}) # Add context for full image URLs
+        return Response(serializer.data)
+
+
     def put(self, request, farm_type, farm_id):
         farm, serializer_class = self.get_farm(farm_id, farm_type)
         if not farm:
             return Response({"error": "Farm not found"}, status=status.HTTP_404_NOT_FOUND)
-        
-        # Check if user owns this farm
-        # if hasattr(farm, 'email') and farm.email != request.user.email:
-        #     return Response({"error": "Permission denied"}, status=status.HTTP_403_FORBIDDEN)
-        
-        serializer = serializer_class(farm, data=request.data, partial=True)
+
+        # request.data intelligently handles both form data and files for multipart requests.
+        # No need to explicitly separate request.FILES unless you have a very specific reason.
+        # Just pass request.data directly to the serializer.
+        serializer = serializer_class(
+            farm,
+            data=request.data,  # Pass request.data directly
+            partial=True,       # Allow partial updates
+            context={'request': request}
+        )
+
         if serializer.is_valid():
-            serializer.save()
+            instance = serializer.save()
+
+            # Handle new image uploads (if 'images' is a ManyToMany field or similar)
+            # If `images` is a separate model (FarmImage) as indicated by your `FarmImage.objects.create` line,
+            # you need to be careful. The current approach assumes:
+            # 1. Your FarmSale/FarmRent models don't have an 'images' field directly.
+            # 2. FarmImage has a ForeignKey to FarmSale/FarmRent (which is 'farm').
+            # 3. You want to ADD new images, not replace existing ones unless explicitly handled.
+            # If you want to replace all images, you'd delete existing ones first.
+            # If the 'images' field in your serializer for FarmSale/FarmRent is a `ManyRelatedField`
+            # or `PrimaryKeyRelatedField` pointing to existing FarmImage IDs, then DRF handles it.
+            # If you're using this manual creation, it implies new images are always *added*.
+            new_images_uploaded = request.FILES.getlist('images', [])
+            if new_images_uploaded:
+                # OPTIONAL: If you want to clear existing images when new ones are uploaded:
+                # instance.images.all().delete() # if 'images' is a related manager on the farm model
+                # or
+                # FarmImage.objects.filter(farm=instance).delete() # if FarmImage relates to farm
+
+                for img_file in new_images_uploaded:
+                    FarmImage.objects.create(
+                        farm=instance,
+                        image=img_file
+                    )
+
+            # DRF's serializer with partial=True should handle `passport` and `ownership_certificate`
+            # automatically if they are `FileField`s in the model and serializer,
+            # as long as the new file is sent in the FormData.
+            # If a field (like passport/ownership_certificate) is not in `request.data`,
+            # `partial=True` means the existing value is kept.
+
             return Response(serializer.data, status=status.HTTP_200_OK)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     
@@ -467,10 +498,6 @@ class FarmDetailView(APIView):
         farm, _ = self.get_farm(farm_id, farm_type) 
         if not farm:
             return Response({"error": "Farm not found"}, status=status.HTTP_404_NOT_FOUND)
-        
-        # Check if user owns this farm
-        # if hasattr(farm, 'email') and farm.email != request.user.email:
-        #     return Response({"error": "Permission denied"}, status=status.HTTP_403_FORBIDDEN)
             
         farm.delete()
         return Response({"message": "Farm deleted successfully"}, status=status.HTTP_204_NO_CONTENT)
