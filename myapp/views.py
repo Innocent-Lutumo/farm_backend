@@ -33,9 +33,12 @@ from .serializers import (
 from .models import (
     FarmSale, FarmRent, 
     FarmImage, 
-    FarmRentTransaction, FarmSaleTransaction
+    FarmRentTransaction, FarmSaleTransaction,
+    RentalAgreement,
 )
 
+from django.core.files.base import ContentFile
+from .PDF_generator import RentalAgreementPDFGenerator
 import json
 import traceback
 from google.oauth2 import id_token
@@ -611,11 +614,6 @@ class ValidatedFarmRentView(generics.RetrieveAPIView):
     serializer_class = FarmRentSerializer
 
     def get_object(self):
-        # This will fetch the most recently validated farm rent contract
-        # You might want to adjust this logic based on how you determine
-        # which "validated" contract to display.
-        # For example, if you pass an ID from the frontend, it would be:
-        # return get_object_or_404(FarmRent, id=self.kwargs['pk'], is_validated=True)
         return self.queryset.order_by('-created_at').first()
 
     def get(self, request, *args, **kwargs):
@@ -626,164 +624,89 @@ class ValidatedFarmRentView(generics.RetrieveAPIView):
         serializer = self.get_serializer(instance)
         return Response(serializer.data)
 
+# PDF generation utility for rental agreements
+@api_view(['POST'])
+def create_rental_agreement(request):
+    try:
+        data = request.data
+        
+        # Create agreement record
+        agreement = RentalAgreement.objects.create(
+            agreement_id=f"MKS-{data['farm_id']}-{data['transaction_id']}",
+            farm_id=data['farm_id'],
+            transaction_id=data['transaction_id'],
+            landlord_name=data['landlord_name'],
+            landlord_phone=data['landlord_phone'],
+            landlord_email=data['landlord_email'],
+            landlord_residence=data['landlord_residence'],
+            landlord_passport=data.get('landlord_passport'),
+            tenant_name=data['tenant_name'],
+            tenant_phone=data['tenant_phone'],
+            tenant_email=data['tenant_email'],
+            tenant_residence=data['tenant_residence'],
+            tenant_passport=data.get('tenant_passport'),
+            farm_location=data['farm_location'],
+            farm_size=data['farm_size'],
+            farm_quality=data['farm_quality'],
+            farm_type=data['farm_type'],
+            farm_description=data.get('farm_description', ''),
+            monthly_rent=data['monthly_rent'],
+            security_deposit=data['monthly_rent'] * 2, 
+            advance_payment=data['monthly_rent'],
+            agreement_date=data['agreement_date'],
+            duration_months=data.get('duration_months', 12)
+        )
+        
+        # Generate PDF
+        pdf_generator = RentalAgreementPDFGenerator(agreement.__dict__)
+        pdf_buffer = pdf_generator.generate_pdf()
+        
+        # Save PDF file
+        pdf_filename = f"rental_agreement_{agreement.agreement_id}.pdf"
+        agreement.pdf_file.save(
+            pdf_filename,
+            ContentFile(pdf_buffer.read()),
+            save=True
+        )
+        
+        return Response({
+            'success': True,
+            'agreement_id': agreement.agreement_id,
+            'message': 'Rental agreement created successfully'
+        })
+        
+    except Exception as e:
+        return Response({
+            'success': False,
+            'error': str(e)
+        }, status=400)
 
-class DownloadContractPDFView(generics.RetrieveAPIView):
-    queryset = FarmRent.objects.all()
-
-    def get(self, request, *args, **kwargs):
-        contract_id = self.kwargs.get('pk')
-        farm_rent_contract = get_object_or_404(FarmRent, pk=contract_id)
-
-        buffer = io.BytesIO()
-        p = canvas.Canvas(buffer, pagesize=letter)
-        styles = getSampleStyleSheet()
-
-        # Add custom styles for better readability
-        p.setFont("Helvetica-Bold", 18)
-        p.drawCentredString(letter[0]/2.0, letter[1] - 50, "JAMHURI YA MUUNGANO WA TANZANIA")
-        p.setFont("Helvetica-Bold", 24)
-        p.setFillColorRGB(0.2, 0.6, 0.2) # Green color
-        p.drawCentredString(letter[0]/2.0, letter[1] - 80, "MKATABA WA KUKODISHA SHAMBA")
-        p.setFillColorRGB(0, 0, 0) # Back to black
-        p.setFont("Helvetica", 10)
-        p.drawCentredString(letter[0]/2.0, letter[1] - 100, "(Farm Rental Agreement)")
-
-        # Contract Number and Date
-        p.setFont("Helvetica-Bold", 12)
-        p.drawString(inch, letter[1] - 140, f"Namba ya Mkataba: {farm_rent_contract.farm_number or f'MKS-{farm_rent_contract.id}'}")
-        p.drawString(inch, letter[1] - 155, f"Tarehe: {farm_rent_contract.created_at.strftime('%d/%m/%Y')}")
-
-        p.line(inch, letter[1] - 170, letter[0] - inch, letter[1] - 170) # Divider
-
-        # Parties Section
-        y_position = letter[1] - 200
-        p.setFont("Helvetica-Bold", 14)
-        p.drawString(inch, y_position, "WAHUSIKA WA MKATABA")
-
-        y_position -= 20
-        p.setFont("Helvetica-Bold", 12)
-        p.drawString(inch, y_position, "MKODISHAJI (LANDLORD):")
-        p.setFont("Helvetica", 10)
-        p.drawString(inch + 0.2 * inch, y_position - 15, f"Jina: Jina la Mkodishaji (Placeholder from AdminSeller)") # This needs to come from AdminSeller
-        p.drawString(inch + 0.2 * inch, y_position - 30, f"Simu: +255 7XX XXX XXX (Placeholder from AdminSeller)")
-        p.drawString(inch + 0.2 * inch, y_position - 45, f"Barua pepe: mkodishaji@mfano.com (Placeholder from AdminSeller)")
-        p.drawString(inch + 0.2 * inch, y_position - 60, f"Makazi: Makazi ya Mkodishaji (Placeholder from AdminSeller)")
-
-
-        y_position -= 90
-        p.setFont("Helvetica-Bold", 12)
-        p.drawString(inch, y_position, "MKODISHWA (TENANT):")
-        p.setFont("Helvetica", 10)
-        p.drawString(inch + 0.2 * inch, y_position - 15, f"Jina: {farm_rent_contract.full_name}")
-        p.drawString(inch + 0.2 * inch, y_position - 30, f"Simu: {farm_rent_contract.phone}")
-        p.drawString(inch + 0.2 * inch, y_position - 45, f"Barua pepe: {farm_rent_contract.email or 'N/A'}")
-        p.drawString(inch + 0.2 * inch, y_position - 60, f"Makazi: {farm_rent_contract.tenant_residence}")
-
-        p.line(inch, y_position - 90, letter[0] - inch, y_position - 90) # Divider
-
-        # Property Description
-        y_position -= 120
-        p.setFont("Helvetica-Bold", 14)
-        p.drawString(inch, y_position, "MAELEZO YA SHAMBA")
-        p.setFont("Helvetica", 10)
-        y_position -= 20
-        p.drawString(inch, y_position, f"Eneo: {farm_rent_contract.location}")
-        y_position -= 15
-        p.drawString(inch, y_position, f"Ukubwa: {farm_rent_contract.size} Ekari")
-        y_position -= 15
-        p.drawString(inch, y_position, f"Udongo: {farm_rent_contract.quality}")
-        y_position -= 15
-        p.drawString(inch, y_position, f"Aina: {farm_rent_contract.farm_type}")
-        if farm_rent_contract.description:
-            y_position -= 15
-            p.drawString(inch, y_position, f"Maelezo Ziada: {farm_rent_contract.description}")
-
-        p.line(inch, y_position - 30, letter[0] - inch, y_position - 30) # Divider
-
-        # Financial Terms
-        y_position -= 60
-        p.setFont("Helvetica-Bold", 14)
-        p.drawString(inch, y_position, "MASHARTI YA KIFEDHA")
-        p.setFont("Helvetica", 10)
-        y_position -= 20
-        p.drawString(inch, y_position, f"Kodi ya Mwezi: TZS {farm_rent_contract.price:,.2f}")
-        y_position -= 15
-        p.drawString(inch, y_position, f"Dhamana: TZS {(farm_rent_contract.price * 2):,.2f}")
-        y_position -= 15
-        p.drawString(inch, y_position, f"Malipo ya Awali: TZS {farm_rent_contract.price:,.2f}")
-
-        p.line(inch, y_position - 30, letter[0] - inch, y_position - 30) # Divider
-
-        # General Terms and Conditions
-        y_position -= 60
-        p.setFont("Helvetica-Bold", 14)
-        p.drawString(inch, y_position, "MASHARTI NA HALI ZA MKATABA")
-        p.setFont("Helvetica", 10)
-        y_position -= 20
-
-        terms = [
-            f"Mkataba huu ni wa miezi 12, kuanzia tarehe {farm_rent_contract.created_at.strftime('%d/%m/%Y')}.",
-            "Kodi hulipwa mwanzoni mwa kila mwezi. Kutochelewa kulipa kunaweza kusababisha faini ya 5% ya kodi ya mwezi.",
-            "Mkodishwa anatakiwa kutunza shamba katika hali nzuri na atatumia shamba kwa madhumuni ya kilimo pekee.",
-            "Mkodisha atahakikisha haki ya matumizi ya amani na atatoa msaada wowote unaohitajika kwa mkodishwa.",
-            "Matengenezo madogo madogo ya shamba ni jukumu la mkodishwa. Matengenezo makubwa ni jukumu la mkodishaji.",
-            "Mkataba huu unaweza kusitishwa na upande wowote kwa kutoa notisi ya maandishi ya miezi miwili.",
-            "Migogoro yoyote inayotokana na mkataba huu itatatuliwa kwa amani, na kama itashindikana, itapelekwa kwa Baraza la Usuluhishi au Mahakama za Tanzania."
-        ]
-
-        for term in terms:
-            textobject = p.beginText(inch, y_position)
-            textobject.textLine(term)
-            p.drawText(textobject)
-            y_position -= 15 # Adjust spacing for terms
-
-        p.line(inch, y_position - 30, letter[0] - inch, y_position - 30) # Divider
-
-        # Signatures and Witnesses
-        y_position -= 60
-        p.setFont("Helvetica-Bold", 14)
-        p.drawString(inch, y_position, "SAHIHI NA MASHAHIDI")
-        p.setFont("Helvetica", 10)
-        y_position -= 30
-
-        # Landlord Signature
-        p.drawString(inch, y_position, "MKODISHAJI (LANDLORD):")
-        p.line(inch + 1.5 * inch, y_position - 10, inch + 4 * inch, y_position - 10)
-        p.drawString(inch + 1.5 * inch, y_position - 25, "Sahihi")
-        p.line(inch + 4.5 * inch, y_position - 10, letter[0] - inch, y_position - 10)
-        p.drawString(inch + 4.5 * inch, y_position - 25, "Tarehe")
-
-        y_position -= 60
-
-        # Tenant Signature
-        p.drawString(inch, y_position, "MKODISHWA (TENANT):")
-        p.line(inch + 1.5 * inch, y_position - 10, inch + 4 * inch, y_position - 10)
-        p.drawString(inch + 1.5 * inch, y_position - 25, "Sahihi")
-        p.line(inch + 4.5 * inch, y_position - 10, letter[0] - inch, y_position - 10)
-        p.drawString(inch + 4.5 * inch, y_position - 25, "Tarehe")
-
-        y_position -= 60
-
-        # Witness 1
-        p.drawString(inch, y_position, "SHAHIDI WA KWANZA:")
-        p.line(inch + 1.5 * inch, y_position - 10, inch + 4 * inch, y_position - 10)
-        p.drawString(inch + 1.5 * inch, y_position - 25, "Jina")
-        p.line(inch + 4.5 * inch, y_position - 10, letter[0] - inch, y_position - 10)
-        p.drawString(inch + 4.5 * inch, y_position - 25, "Sahihi")
-
-        y_position -= 60
-
-        # Witness 2
-        p.drawString(inch, y_position, "SHAHIDI WA PILI:")
-        p.line(inch + 1.5 * inch, y_position - 10, inch + 4 * inch, y_position - 10)
-        p.drawString(inch + 1.5 * inch, y_position - 25, "Jina")
-        p.line(inch + 4.5 * inch, y_position - 10, letter[0] - inch, y_position - 10)
-        p.drawString(inch + 4.5 * inch, y_position - 25, "Sahihi")
-
-        p.showPage()
-        p.save()
-
-        buffer.seek(0)
-        response = HttpResponse(buffer, content_type='application/pdf')
-        response['Content-Disposition'] = f'attachment; filename="Mkataba_wa_Kukodisha_Shamba_{farm_rent_contract.farm_number or farm_rent_contract.id}.pdf"'
-        return response
+@api_view(['GET'])
+def download_rental_agreement(request, agreement_id):
+    try:
+        agreement = RentalAgreement.objects.get(agreement_id=agreement_id)
+        
+        if agreement.pdf_file:
+            # Return existing PDF
+            response = HttpResponse(
+                agreement.pdf_file.read(),
+                content_type='application/pdf'
+            )
+            response['Content-Disposition'] = f'attachment; filename="Mkataba_wa_Kukodisha_Shamba_{agreement_id}.pdf"'
+            return response
+        else:
+            # Generate PDF on-the-fly if not exists
+            pdf_generator = RentalAgreementPDFGenerator(agreement.__dict__)
+            pdf_buffer = pdf_generator.generate_pdf()
+            
+            response = HttpResponse(
+                pdf_buffer.read(),
+                content_type='application/pdf'
+            )
+            response['Content-Disposition'] = f'attachment; filename="Mkataba_wa_Kukodisha_Shamba_{agreement_id}.pdf"'
+            return response
+            
+    except RentalAgreement.DoesNotExist:
+        return Response({
+            'error': 'Agreement not found'
+        }, status=404)

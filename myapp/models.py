@@ -158,6 +158,56 @@ class FarmSaleTransaction(models.Model):
         return f"Transaction {self.transaction_id} - {self.farm.location}"  
     
 
-
+class RentalAgreement(models.Model):
+    # Agreement identification
+    agreement_id = models.CharField(max_length=100, unique=True)
+    farm_id = models.IntegerField()
+    transaction_id = models.IntegerField()
+    
+    # Parties information
+    landlord_name = models.CharField(max_length=200)
+    landlord_phone = models.CharField(max_length=20)
+    landlord_email = models.EmailField()
+    landlord_residence = models.TextField()
+    landlord_passport = models.TextField(null=True, blank=True) 
+    
+    tenant_name = models.CharField(max_length=200)
+    tenant_phone = models.CharField(max_length=20)
+    tenant_email = models.EmailField()
+    tenant_residence = models.TextField()
+    tenant_passport = models.TextField(null=True, blank=True)
+    
+    # Farm details
+    farm_location = models.CharField(max_length=200)
+    farm_size = models.DecimalField(max_digits=10, decimal_places=2)
+    farm_quality = models.CharField(max_length=100)
+    farm_type = models.CharField(max_length=100)
+    farm_description = models.TextField(blank=True)
+    
+    # Financial terms
+    monthly_rent = models.DecimalField(max_digits=12, decimal_places=2)
+    security_deposit = models.DecimalField(max_digits=12, decimal_places=2)
+    advance_payment = models.DecimalField(max_digits=12, decimal_places=2)
+    
+    # Agreement details
+    agreement_date = models.DateTimeField()
+    duration_months = models.IntegerField(default=12)
+    
+    # Status and tracking
+    status = models.CharField(max_length=20, choices=[
+        ('draft', 'Draft'),
+        ('active', 'Active'),
+        ('expired', 'Expired'),
+        ('terminated', 'Terminated')
+    ], default='active')
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    # PDF file storage
+    pdf_file = models.FileField(upload_to='rental_agreements/', null=True, blank=True)
+    
+    class Meta:
+        db_table = 'rental_agreements'
     
 
