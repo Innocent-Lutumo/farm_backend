@@ -10,7 +10,7 @@ from django.contrib.auth.models import User, Group
 from django.contrib.auth import get_user_model
 from django.views.decorators.csrf import csrf_exempt
 from rest_framework.authtoken.models import Token
-from django.http import JsonResponse, HttpResponse
+from django.http import JsonResponse, HttpResponse, FileResponse
 from django.shortcuts import get_object_or_404
 from django.core.mail import send_mail
 from django.db.models import Q
@@ -27,7 +27,8 @@ from .serializers import (
     FarmSaleSerializer, 
     FarmRentSerializer, 
     FarmRentTransactionSerializer, 
-    FarmSaleTransactionSerializer
+    FarmSaleTransactionSerializer,
+    RentalAgreementSerializer
 )
 
 from .models import (
@@ -48,6 +49,7 @@ from reportlab.pdfgen import canvas
 from reportlab.lib.pagesizes import letter
 from reportlab.lib.units import inch
 from reportlab.lib.styles import getSampleStyleSheet
+import os
 
 # token generation view for sellers
 class CustomTokenObtainPairView(TokenObtainPairView):
@@ -623,90 +625,50 @@ class ValidatedFarmRentView(generics.RetrieveAPIView):
                             status=status.HTTP_404_NOT_FOUND)
         serializer = self.get_serializer(instance)
         return Response(serializer.data)
-
-# PDF generation utility for rental agreements
-@api_view(['POST'])
-def create_rental_agreement(request):
-    try:
-        data = request.data
+    
+# view for creating a rental agreement
+class CreateRentalAgreementView(generics.CreateAPIView):
+    queryset = RentalAgreement.objects.all()
+    serializer_class = RentalAgreementSerializer
+    
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
         
-        # Create agreement record
-        agreement = RentalAgreement.objects.create(
-            agreement_id=f"MKS-{data['farm_id']}-{data['transaction_id']}",
-            farm_id=data['farm_id'],
-            transaction_id=data['transaction_id'],
-            landlord_name=data['landlord_name'],
-            landlord_phone=data['landlord_phone'],
-            landlord_email=data['landlord_email'],
-            landlord_residence=data['landlord_residence'],
-            landlord_passport=data.get('landlord_passport'),
-            tenant_name=data['tenant_name'],
-            tenant_phone=data['tenant_phone'],
-            tenant_email=data['tenant_email'],
-            tenant_residence=data['tenant_residence'],
-            tenant_passport=data.get('tenant_passport'),
-            farm_location=data['farm_location'],
-            farm_size=data['farm_size'],
-            farm_quality=data['farm_quality'],
-            farm_type=data['farm_type'],
-            farm_description=data.get('farm_description', ''),
-            monthly_rent=data['monthly_rent'],
-            security_deposit=data['monthly_rent'] * 2, 
-            advance_payment=data['monthly_rent'],
-            agreement_date=data['agreement_date'],
-            duration_months=data.get('duration_months', 12)
-        )
+        # Calculate deposit as 2x monthly rent
+        monthly_rent = serializer.validated_data['monthly_rent']
+        serializer.validated_data['deposit_amount'] = monthly_rent * 2
         
-        # Generate PDF
-        pdf_generator = RentalAgreementPDFGenerator(agreement.__dict__)
-        pdf_buffer = pdf_generator.generate_pdf()
+        # Set initial payment equal to monthly rent
+        serializer.validated_data['initial_payment'] = monthly_rent
         
-        # Save PDF file
-        pdf_filename = f"rental_agreement_{agreement.agreement_id}.pdf"
-        agreement.pdf_file.save(
-            pdf_filename,
-            ContentFile(pdf_buffer.read()),
-            save=True
-        )
+        self.perform_create(serializer)
+        headers = self.get_success_headers(serializer.data)
         
         return Response({
             'success': True,
-            'agreement_id': agreement.agreement_id,
+            'agreement_id': serializer.data['agreement_id'],
             'message': 'Rental agreement created successfully'
-        })
-        
-    except Exception as e:
-        return Response({
-            'success': False,
-            'error': str(e)
-        }, status=400)
+        }, status=status.HTTP_201_CREATED, headers=headers)
 
-@api_view(['GET'])
-def download_rental_agreement(request, agreement_id):
-    try:
-        agreement = RentalAgreement.objects.get(agreement_id=agreement_id)
+class DownloadRentalAgreementView(APIView):
+    def get(self, request, agreement_id):
+        agreement = get_object_or_404(RentalAgreement, agreement_id=agreement_id)
         
-        if agreement.pdf_file:
-            # Return existing PDF
-            response = HttpResponse(
-                agreement.pdf_file.read(),
-                content_type='application/pdf'
+        if not agreement.pdf_document:
+            return Response(
+                {'error': 'PDF document not generated yet'},
+                status=status.HTTP_404_NOT_FOUND
             )
+        
+        file_path = os.path.join(settings.MEDIA_ROOT, str(agreement.pdf_document))
+        
+        if os.path.exists(file_path):
+            response = FileResponse(open(file_path, 'rb'), content_type='application/pdf')
             response['Content-Disposition'] = f'attachment; filename="Mkataba_wa_Kukodisha_Shamba_{agreement_id}.pdf"'
             return response
-        else:
-            # Generate PDF on-the-fly if not exists
-            pdf_generator = RentalAgreementPDFGenerator(agreement.__dict__)
-            pdf_buffer = pdf_generator.generate_pdf()
-            
-            response = HttpResponse(
-                pdf_buffer.read(),
-                content_type='application/pdf'
-            )
-            response['Content-Disposition'] = f'attachment; filename="Mkataba_wa_Kukodisha_Shamba_{agreement_id}.pdf"'
-            return response
-            
-    except RentalAgreement.DoesNotExist:
-        return Response({
-            'error': 'Agreement not found'
-        }, status=404)
+        
+        return Response(
+            {'error': 'PDF file not found on server'},
+            status=status.HTTP_404_NOT_FOUND
+        )

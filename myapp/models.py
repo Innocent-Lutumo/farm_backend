@@ -2,6 +2,7 @@ from django.db import models
 from django.contrib.auth.models import User, AbstractUser
 from .utils import some_user_function
 from django.utils.timezone import now
+from django.core.validators import MinValueValidator
 
 
 def get_default_user():
@@ -159,55 +160,78 @@ class FarmSaleTransaction(models.Model):
     
 
 class RentalAgreement(models.Model):
-    # Agreement identification
-    agreement_id = models.CharField(max_length=100, unique=True)
-    farm_id = models.IntegerField()
-    transaction_id = models.IntegerField()
-    
-    # Parties information
-    landlord_name = models.CharField(max_length=200)
-    landlord_phone = models.CharField(max_length=20)
-    landlord_email = models.EmailField()
-    landlord_residence = models.TextField()
-    landlord_passport = models.TextField(null=True, blank=True) 
-    
-    tenant_name = models.CharField(max_length=200)
-    tenant_phone = models.CharField(max_length=20)
-    tenant_email = models.EmailField()
-    tenant_residence = models.TextField()
-    tenant_passport = models.TextField(null=True, blank=True)
-    
-    # Farm details
-    farm_location = models.CharField(max_length=200)
-    farm_size = models.DecimalField(max_digits=10, decimal_places=2)
-    farm_quality = models.CharField(max_length=100)
-    farm_type = models.CharField(max_length=100)
-    farm_description = models.TextField(blank=True)
-    
-    # Financial terms
-    monthly_rent = models.DecimalField(max_digits=12, decimal_places=2)
-    security_deposit = models.DecimalField(max_digits=12, decimal_places=2)
-    advance_payment = models.DecimalField(max_digits=12, decimal_places=2)
-    
-    # Agreement details
-    agreement_date = models.DateTimeField()
-    duration_months = models.IntegerField(default=12)
-    
-    # Status and tracking
-    status = models.CharField(max_length=20, choices=[
-        ('draft', 'Draft'),
-        ('active', 'Active'),
-        ('expired', 'Expired'),
-        ('terminated', 'Terminated')
-    ], default='active')
-    
+    # Agreement metadata
+    agreement_id = models.AutoField(primary_key=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    is_active = models.BooleanField(default=True)
     
-    # PDF file storage
-    pdf_file = models.FileField(upload_to='rental_agreements/', null=True, blank=True)
+    # Farm information
+    farm_id = models.PositiveIntegerField()
+    farm_number = models.CharField(max_length=50, blank=False, default='N/A')
+    farm_location = models.CharField(max_length=255)
+    farm_size = models.DecimalField(max_digits=10, decimal_places=2, validators=[MinValueValidator(0)])
+    farm_quality = models.CharField(max_length=100)
+    farm_type = models.CharField(max_length=100)
+    farm_description = models.TextField(blank=True, null=True)
+    
+    # Landlord information
+    landlord_name = models.CharField(max_length=255)
+    landlord_phone = models.CharField(max_length=20)
+    landlord_email = models.EmailField()
+    landlord_residence = models.CharField(max_length=255)
+    landlord_passport = models.ImageField(upload_to='passports/landlords/', blank=True, null=True)
+    
+    # Tenant information
+    tenant_name = models.CharField(max_length=255)
+    tenant_phone = models.CharField(max_length=20)
+    tenant_email = models.EmailField()
+    tenant_residence = models.CharField(max_length=255)
+    tenant_passport = models.ImageField(upload_to='passports/tenants/', blank=True, null=True)
+    
+    # Financial terms
+    monthly_rent = models.DecimalField(max_digits=12, decimal_places=2, validators=[MinValueValidator(0)], null=True,  # Make it nullable
+        blank=True)
+    deposit_amount = models.DecimalField(max_digits=12, decimal_places=2, validators=[MinValueValidator(0)],null=True,  # Make it nullable
+        blank=True)
+    initial_payment = models.DecimalField(max_digits=12, decimal_places=2, validators=[MinValueValidator(0)], null=True,  # Make it nullable
+        blank=True)
+    
+    # Agreement terms
+    agreement_date = models.DateField()
+    duration_months = models.PositiveIntegerField(default=12)
+    late_fee_percentage = models.DecimalField(max_digits=5, decimal_places=2, default=5.0)
+    
+    # Status fields
+    is_signed = models.BooleanField(default=False)
+    signed_date = models.DateField(blank=True, null=True)
+    pdf_document = models.FileField(upload_to='rental_agreements/', blank=True, null=True)
+    
+    # Transaction reference
+    transaction_id = models.PositiveIntegerField()
+    
+    # Witness information (optional)
+    witness1_name = models.CharField(max_length=255, blank=True, null=True)
+    witness1_signature = models.ImageField(upload_to='signatures/witnesses/', blank=True, null=True)
+    witness2_name = models.CharField(max_length=255, blank=True, null=True)
+    witness2_signature = models.ImageField(upload_to='signatures/witnesses/', blank=True, null=True)
     
     class Meta:
-        db_table = 'rental_agreements'
+        verbose_name = "Rental Agreement"
+        verbose_name_plural = "Rental Agreements"
+        ordering = ['-created_at']
+    
+    def __str__(self):
+        return f"Rental Agreement {self.agreement_id} - {self.farm_number}"
+    
+    def calculate_deposit(self):
+        """Calculate deposit as 2x monthly rent"""
+        return self.monthly_rent * 2
+    
+    def save(self, *args, **kwargs):
+        """Auto-calculate deposit amount before saving"""
+        if not self.deposit_amount:
+            self.deposit_amount = self.calculate_deposit()
+        super().save(*args, **kwargs)
     
 

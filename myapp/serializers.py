@@ -5,6 +5,7 @@ from django.core.exceptions import ValidationError
 from django.core.validators import EmailValidator
 import os
 import re
+from django.utils import timezone
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 
 
@@ -274,8 +275,76 @@ class RegisterSerializer(serializers.ModelSerializer):
         instance.save() # Save changes to the instance
         return instance
     
-
-
-
+# serializer for rental agreement
+class RentalAgreementSerializer(serializers.ModelSerializer):
+    # You can add custom fields or validation here if needed
+    landlord_passport_url = serializers.SerializerMethodField()
+    tenant_passport_url = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = RentalAgreement
+        fields = [
+            'agreement_id',
+            'farm_id',
+            'farm_number',
+            'farm_location',
+            'farm_size',
+            'farm_quality',
+            'farm_type',
+            'farm_description',
+            'landlord_name',
+            'landlord_phone',
+            'landlord_email',
+            'landlord_residence',
+            'landlord_passport',
+            'landlord_passport_url',
+            'tenant_name',
+            'tenant_phone',
+            'tenant_email',
+            'tenant_residence',
+            'tenant_passport',
+            'tenant_passport_url',
+            'monthly_rent',
+            'deposit_amount',
+            'initial_payment',
+            'agreement_date',
+            'duration_months',
+            'late_fee_percentage',
+            'is_signed',
+            'signed_date',
+            'transaction_id',
+            'created_at',
+            'updated_at'
+        ]
+        read_only_fields = [
+            'agreement_id',
+            'created_at',
+            'updated_at',
+            'deposit_amount'  # This is auto-calculated
+        ]
+    
+    def get_landlord_passport_url(self, obj):
+        if obj.landlord_passport:
+            return self.context['request'].build_absolute_uri(obj.landlord_passport.url)
+        return None
+    
+    def get_tenant_passport_url(self, obj):
+        if obj.tenant_passport:
+            return self.context['request'].build_absolute_uri(obj.tenant_passport.url)
+        return None
+    
+    def validate(self, data):
+        """
+        Custom validation for the rental agreement data
+        """
+        # Ensure agreement date is not in the future
+        if data['agreement_date'] > timezone.now().date():
+            raise serializers.ValidationError("Agreement date cannot be in the future")
+        
+        # Ensure duration is at least 1 month
+        if data['duration_months'] < 1:
+            raise serializers.ValidationError("Duration must be at least 1 month")
+        
+        return data
 
     
