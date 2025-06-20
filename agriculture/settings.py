@@ -42,6 +42,7 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'djoser',
     'myapp',
     'mypanel',
     'seller',
@@ -173,10 +174,17 @@ CORS_ALLOWED_ORIGINS = [
 
 CORS_ALLOW_CREDENTIALS = True  
 
+
 CORS_ALLOW_HEADERS = [
-    'content-type',
-    'authorization',  
-    'x-csrftoken',  
+    "accept",
+    "accept-encoding",
+    "authorization",
+    "content-type",
+    "dnt",
+    "origin",
+    "user-agent",
+    "x-csrftoken",
+    "x-requested-with",
 ]
 
 
@@ -187,6 +195,7 @@ EMAIL_PORT = 587
 EMAIL_USE_TLS = True
 EMAIL_HOST_USER = 'innocrng23@gmail.com'
 EMAIL_HOST_PASSWORD = 'ibupwummyfbiaaxt'
+DEFAULT_FROM_EMAIL = 'innocrng23@gmail.com'
 FRONTEND_URL = 'http://localhost:3000'  
 BACKEND_URL = 'http://localhost:8000'  
 
@@ -197,6 +206,29 @@ REST_FRAMEWORK = {
     ],
 
 }
+
+# --- Djoser Settings ---
+DJOSER = {
+    'USER_ID_FIELD': 'id', 
+    'LOGIN_FIELD': 'username',
+    'SEND_ACTIVATION_EMAIL': True, 
+    'PASSWORD_RESET_CONFIRM_URL': 'password-reset/{uid}/{token}', 
+    'USERNAME_RESET_CONFIRM_URL': 'username-reset/{uid}/{token}', 
+    'ACTIVATION_URL': 'activation/{uid}/{token}', 
+    
+    # Custom serializers if you extend Djoser's default user serializers
+    'SERIALIZERS': {
+        'user_create': 'myapp.serializers.CustomUserCreateSerializer', 
+        'user': 'myapp.serializers.CustomUserSerializer',             
+        'current_user': 'myapp.serializers.CustomUserSerializer',    
+    },
+    'EMAIL': {
+        'password_reset': 'djoser.email.PasswordResetEmail',
+    }
+}
+
+SITE_ID = 1
+
 SIMPLE_JWT = {
     'ACCESS_TOKEN_LIFETIME': timedelta(days=1), 
     'REFRESH_TOKEN_LIFETIME': timedelta(days=1),     

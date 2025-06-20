@@ -11,7 +11,11 @@ from django.contrib.auth import get_user_model
 from django.views.decorators.csrf import csrf_exempt
 from rest_framework.authtoken.models import Token
 from django.http import JsonResponse, HttpResponse, FileResponse
+from django.utils.encoding import force_str, force_bytes
+from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
+from django.contrib.auth.tokens import default_token_generator
 from django.shortcuts import get_object_or_404
+from django.template.loader import render_to_string
 from django.core.mail import send_mail
 from django.db.models import Q
 from django.conf import settings
@@ -19,6 +23,7 @@ from rest_framework.decorators import api_view, action
 from rest_framework import viewsets
 from rest_framework_simplejwt.authentication import JWTAuthentication
 from rest_framework import generics
+from .utils import generate_rental_agreement_pdf 
 
 from .utils import verify_google_token
 from .serializers import (
@@ -46,6 +51,11 @@ from google.oauth2 import id_token
 from google.auth.transport.requests import Request
 import io
 from reportlab.pdfgen import canvas
+import logging
+
+# Configure logger
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
 from reportlab.lib.pagesizes import letter
 from reportlab.lib.units import inch
 from reportlab.lib.styles import getSampleStyleSheet
@@ -554,6 +564,9 @@ def send_transaction_email(request):
 def send_transaction_email_rent(request):
     email = request.data.get('renter_email')
     transaction_id = request.data.get('transaction_id')
+    location = request.data.get('location')
+    size = request.data.get('size')
+    price = request.data.get('price')
 
     if not email or not transaction_id:
         return Response({'error': 'Missing renter_email or transaction_id'}, status=400)
@@ -561,7 +574,7 @@ def send_transaction_email_rent(request):
     try:
         send_mail(
             'Your Transaction ID from Farm Finder',
-            f'Thank you for your rental! Your transaction ID is: {transaction_id}',
+            f'Thank you for your rental request for the farm rented for {price}TZS located at {location} and the size {size}. Your transaction ID is: {transaction_id} keep the id  safe for the history tracking to know the seller feedack and to access the phone number and email to directly communicate with the seller',
             settings.EMAIL_HOST_USER,
             [email]
         )
@@ -635,40 +648,62 @@ class CreateRentalAgreementView(generics.CreateAPIView):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         
-        # Calculate deposit as 2x monthly rent
+        # Calculate financial terms
         monthly_rent = serializer.validated_data['monthly_rent']
         serializer.validated_data['deposit_amount'] = monthly_rent * 2
-        
-        # Set initial payment equal to monthly rent
         serializer.validated_data['initial_payment'] = monthly_rent
         
+        # Create the agreement
         self.perform_create(serializer)
+        
+        # Generate PDF after creation
+        agreement = serializer.instance
+        try:
+            pdf_path = generate_rental_agreement_pdf(agreement)
+            agreement.pdf_document = os.path.relpath(pdf_path, settings.MEDIA_ROOT)
+            agreement.save()
+        except Exception as e:
+            # Log the error but don't fail the request
+            print(f"Error generating PDF: {str(e)}")
+        
         headers = self.get_success_headers(serializer.data)
         
         return Response({
             'success': True,
-            'agreement_id': serializer.data['agreement_id'],
+            'agreement_id': agreement.agreement_id, 
             'message': 'Rental agreement created successfully'
         }, status=status.HTTP_201_CREATED, headers=headers)
 
 class DownloadRentalAgreementView(APIView):
     def get(self, request, agreement_id):
-        agreement = get_object_or_404(RentalAgreement, agreement_id=agreement_id)
-        
-        if not agreement.pdf_document:
+        try:
+            agreement = get_object_or_404(RentalAgreement, agreement_id=agreement_id)
+            
+            if not agreement.pdf_document:
+                # Try to generate PDF if it doesn't exist
+                pdf_path = generate_rental_agreement_pdf(agreement)
+                agreement.pdf_document = os.path.relpath(pdf_path, settings.MEDIA_ROOT)
+                agreement.save()
+            
+            file_path = os.path.join(settings.MEDIA_ROOT, str(agreement.pdf_document))
+            
+            if os.path.exists(file_path):
+                response = FileResponse(
+                    open(file_path, 'rb'), 
+                    content_type='application/pdf'
+                )
+                response['Content-Disposition'] = (
+                    f'attachment; filename="Mkataba_wa_Kukodisha_Shamba_{agreement_id}.pdf"'
+                )
+                return response
+            
             return Response(
-                {'error': 'PDF document not generated yet'},
+                {'error': 'PDF file not found on server and could not be generated'},
                 status=status.HTTP_404_NOT_FOUND
             )
-        
-        file_path = os.path.join(settings.MEDIA_ROOT, str(agreement.pdf_document))
-        
-        if os.path.exists(file_path):
-            response = FileResponse(open(file_path, 'rb'), content_type='application/pdf')
-            response['Content-Disposition'] = f'attachment; filename="Mkataba_wa_Kukodisha_Shamba_{agreement_id}.pdf"'
-            return response
-        
-        return Response(
-            {'error': 'PDF file not found on server'},
-            status=status.HTTP_404_NOT_FOUND
-        )
+            
+        except Exception as e:
+            return Response(
+                {'error': f'Error processing PDF: {str(e)}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )

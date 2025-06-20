@@ -7,6 +7,7 @@ import os
 import re
 from django.utils import timezone
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
+from djoser.serializers import UserCreateSerializer, UserSerializer
 
 
 class FarmImageSerializer(serializers.ModelSerializer):
@@ -215,64 +216,82 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
         })
         
         return data
+    
+
+class CustomUserCreateSerializer(UserCreateSerializer):
+    class Meta(UserCreateSerializer.Meta):
+        model = User # <--- Referencing your custom User model
+        fields = ('id', 'username', 'email', 'password', 'seller_name', 'seller_residence') # <-- Added new fields
+        # You can add 'email' here if you want it collected at registration, but if you want it
+        # as the LOGIN_FIELD, it's better to make it unique in the model.
+        # If 'email' is not in `REQUIRED_FIELDS` in AbstractUser, you might need to add it here
+        # along with making it unique in the model for Djoser to recognize it.
+
+class CustomUserSerializer(UserSerializer):
+    class Meta(UserSerializer.Meta):
+        model = User # <--- Referencing your custom User model
+        fields = ('id', 'username', 'email', 'seller_name', 'seller_residence') # <-- Added new fields for user details
+        read_only_fields = ('username', 'email',)
  
 class RegisterSerializer(serializers.ModelSerializer):
     seller_name = serializers.CharField(max_length=150)
     username = serializers.CharField(max_length=150)
     seller_residence = serializers.CharField(max_length=255)
+    email = serializers.EmailField(required=True, allow_blank=False)
     password = serializers.CharField(write_only=True, style={'input_type': 'password'})
     confirmPassword = serializers.CharField(write_only=True, style={'input_type': 'password'})
-    
+
     class Meta:
         model = User
-        # Include your new fields directly in Meta.fields
-        fields = ['id', 'seller_name', 'username', 'seller_residence', 'password', 'confirmPassword']
-        extra_kwargs = {'password': {'write_only': True}, 'confirmPassword': {'write_only': True}} # Good practice
+        fields = ['id', 'seller_name', 'username', 'seller_residence', 'email', 'password', 'confirmPassword']
+        extra_kwargs = {
+            'password': {'write_only': True},
+            'confirmPassword': {'write_only': True}
+        }
 
     def validate(self, data):
-        # Your existing validation logic
         if User.objects.filter(username=data['username']).exists():
             raise serializers.ValidationError("Username already exists.")
+        
+        if User.objects.filter(email=data['email']).exists():
+            raise serializers.ValidationError("Email already exists.")
+        
         if data['password'] != data['confirmPassword']:
             raise serializers.ValidationError("Password and Confirm Password do not match.")
+        
         return data
-    
+
     def create(self, validated_data):
         validated_data.pop('confirmPassword', None)
-        
-        # Assign directly to the new model fields
         seller_name = validated_data.pop('seller_name')
         seller_residence = validated_data.pop('seller_residence')
         
-        # Use create_user to handle password hashing
-        user = User.objects.create_user(**validated_data) 
-        
-        # Now assign to the custom fields on your User model
+        user = User.objects.create_user(**validated_data)
         user.seller_name = seller_name
         user.seller_residence = seller_residence
-        user.save() # Save the user after setting the custom fields
+        user.save()
         
         return user
-    
+
     def update(self, instance, validated_data):
         validated_data.pop('confirmPassword', None)
 
-        # Update custom fields if provided
         if 'seller_name' in validated_data:
             instance.seller_name = validated_data.pop('seller_name')
         
         if 'seller_residence' in validated_data:
             instance.seller_residence = validated_data.pop('seller_residence')
         
-        # Update username if provided
         if 'username' in validated_data:
             instance.username = validated_data.pop('username')
         
-        # Update password if provided
+        if 'email' in validated_data:
+            instance.email = validated_data.pop('email')
+        
         if 'password' in validated_data:
             instance.set_password(validated_data.pop('password'))
             
-        instance.save() # Save changes to the instance
+        instance.save()
         return instance
     
 # serializer for rental agreement
@@ -320,7 +339,7 @@ class RentalAgreementSerializer(serializers.ModelSerializer):
             'agreement_id',
             'created_at',
             'updated_at',
-            'deposit_amount'  # This is auto-calculated
+            'deposit_amount'  
         ]
     
     def get_landlord_passport_url(self, obj):
