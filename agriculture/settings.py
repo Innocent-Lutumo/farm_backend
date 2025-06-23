@@ -90,7 +90,7 @@ WSGI_APPLICATION = 'agriculture.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
-        'NAME': 'farmdb',
+        'NAME': 'dbfarm',
         'USER': 'postgres',
         'PASSWORD': 'myinnoc@2030',  
         'HOST': 'localhost',

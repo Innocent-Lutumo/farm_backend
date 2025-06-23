@@ -40,8 +40,8 @@ urlpatterns = [
     path('send-transaction-email/', send_transaction_email, name='send_transaction_email'),
     path('send-transaction-email-rent/', send_transaction_email_rent, name='send_transaction_email_rent'),
     path('all-farms/<str:farm_type>/<int:farm_id>/', FarmDetailView.as_view(), name='farm_detail'),
-    path('api/create-rental-agreement/', CreateRentalAgreementView.as_view(), name='create-rental-agreement'),
-    path('api/download-rental-agreement/<int:agreement_id>/', DownloadRentalAgreementView.as_view(), name='download-rental-agreement'),
+    path('create-rental-agreement/', CreateRentalAgreementView.as_view(), name='create_rental_agreement'),
+    path('download-rental-agreement/<int:pk>/', DownloadRentalAgreementView.as_view(), name='download_rental_agreement'),
     path("", include(router.urls)),
 ]
 
