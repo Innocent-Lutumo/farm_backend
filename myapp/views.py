@@ -48,6 +48,7 @@ from .models import (
     FarmImage, 
     FarmRentTransaction, FarmSaleTransaction,
     RentalAgreement, 
+    PurchaseAgreement,
 )
 
 from google.oauth2 import id_token
@@ -638,20 +639,20 @@ class RentalAgreementPDFGenerator:
         self.doc = SimpleDocTemplate(
             self.buffer,
             pagesize=A4,
-            rightMargin=2*cm,
-            leftMargin=2*cm,
-            topMargin=2*cm,
-            bottomMargin=2*cm
+            rightMargin=1.5*cm,  
+            leftMargin=1.5*cm,
+            topMargin=1.5*cm,
+            bottomMargin=1.5*cm
         )
         self.styles = getSampleStyleSheet()
         self.story = []
         
-        # Custom styles
+        # Custom styles with smaller fonts and spacing
         self.title_style = ParagraphStyle(
             'CustomTitle',
             parent=self.styles['Heading1'],
-            fontSize=16,
-            spaceAfter=12,
+            fontSize=14,  
+            spaceAfter=6,  
             alignment=TA_CENTER,
             textColor=colors.darkgreen
         )
@@ -659,20 +660,21 @@ class RentalAgreementPDFGenerator:
         self.heading_style = ParagraphStyle(
             'CustomHeading',
             parent=self.styles['Heading2'],
-            fontSize=12,
-            spaceAfter=8,
+            fontSize=10,  
+            spaceAfter=4,  
             textColor=colors.darkblue
         )
         
         self.normal_style = ParagraphStyle(
             'CustomNormal',
             parent=self.styles['Normal'],
-            fontSize=10,
-            spaceAfter=6
+            fontSize=8,  
+            spaceAfter=4,  
+            leading=10    
         )
 
     def add_header(self):
-        """Add document header"""
+        """Add document header with compact spacing"""
         header_data = [
             [Paragraph("JAMHURI YA MUUNGANO WA TANZANIA", self.title_style)],
             [Paragraph("MKATABA WA KUKODISHA SHAMBA", self.title_style)],
@@ -685,17 +687,17 @@ class RentalAgreementPDFGenerator:
         header_table.setStyle(TableStyle([
             ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
             ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 4),  
         ]))
         
         self.story.append(header_table)
-        self.story.append(Spacer(1, 0.5*cm))
+        self.story.append(Spacer(1, 0.3*cm))  
 
     def add_parties_section(self):
-        """Add parties information"""
+        """Add parties information with compact layout"""
         self.story.append(Paragraph("WAHUSIKA WA MKATABA", self.heading_style))
         
-        # Parties table
+        # Parties table with tighter layout
         parties_data = [
             [
                 Paragraph("<b>MKODISHAJI (LANDLORD)</b>", self.normal_style),
@@ -722,16 +724,17 @@ class RentalAgreementPDFGenerator:
         parties_table = Table(parties_data, colWidths=[8.5*cm, 8.5*cm])
         parties_table.setStyle(TableStyle([
             ('VALIGN', (0, 0), (-1, -1), 'TOP'),
-            ('LEFTPADDING', (0, 0), (-1, -1), 6),
-            ('RIGHTPADDING', (0, 0), (-1, -1), 6),
+            ('LEFTPADDING', (0, 0), (-1, -1), 4),  
+            ('RIGHTPADDING', (0, 0), (-1, -1), 4),
             ('GRID', (0, 0), (-1, -1), 1, colors.lightgrey),
+            ('FONTSIZE', (0, 0), (-1, -1), 8),    
         ]))
         
         self.story.append(parties_table)
-        self.story.append(Spacer(1, 0.5*cm))
+        self.story.append(Spacer(1, 0.3*cm))  
 
     def add_property_details(self):
-        """Add property details section"""
+        """Add property details section with compact layout"""
         self.story.append(Paragraph("MAELEZO YA SHAMBA", self.heading_style))
         
         property_data = [
@@ -754,16 +757,17 @@ class RentalAgreementPDFGenerator:
         property_table = Table(property_data, colWidths=[8.5*cm, 8.5*cm])
         property_table.setStyle(TableStyle([
             ('VALIGN', (0, 0), (-1, -1), 'TOP'),
-            ('LEFTPADDING', (0, 0), (-1, -1), 6),
-            ('RIGHTPADDING', (0, 0), (-1, -1), 6),
+            ('LEFTPADDING', (0, 0), (-1, -1), 4),  # Reduced padding
+            ('RIGHTPADDING', (0, 0), (-1, -1), 4),
             ('GRID', (0, 0), (-1, -1), 1, colors.lightgrey),
+            ('FONTSIZE', (0, 0), (-1, -1), 8),      # Smaller font for table
         ]))
         
         self.story.append(property_table)
-        self.story.append(Spacer(1, 0.5*cm))
+        self.story.append(Spacer(1, 0.3*cm))  # Reduced spacer
 
     def add_financial_terms(self):
-        """Add financial terms section"""
+        """Add financial terms section with compact layout"""
         self.story.append(Paragraph("MASHARTI YA KIFEDHA", self.heading_style))
         
         price = float(self.data.get('price', 0))
@@ -782,22 +786,24 @@ class RentalAgreementPDFGenerator:
         financial_table.setStyle(TableStyle([
             ('VALIGN', (0, 0), (-1, -1), 'TOP'),
             ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-            ('LEFTPADDING', (0, 0), (-1, -1), 6),
-            ('RIGHTPADDING', (0, 0), (-1, -1), 6),
+            ('LEFTPADDING', (0, 0), (-1, -1), 4),  
+            ('RIGHTPADDING', (0, 0), (-1, -1), 4),
             ('GRID', (0, 0), (-1, -1), 1, colors.lightgrey),
             ('BACKGROUND', (0, 0), (-1, -1), colors.lightblue),
+            ('FONTSIZE', (0, 0), (-1, -1), 8),     
         ]))
         
         self.story.append(financial_table)
-        self.story.append(Spacer(1, 0.5*cm))
+        self.story.append(Spacer(1, 0.3*cm))  
 
     def add_terms_and_conditions(self):
-        """Add terms and conditions"""
+        """Add terms and conditions with compact layout"""
         self.story.append(Paragraph("MASHARTI NA HALI ZA MKATABA", self.heading_style))
         
         duration = self.data.get('duration_months', 12)
         start_date = self.format_date(self.data.get('agreement_date'))
         
+        # More compact terms list
         terms = [
             f"1. Mkataba huu ni wa miezi {duration} kuanzia {start_date}.",
             "2. Kodi hulipwa mwanzoni mwa kila mwezi. Faini ya 5% kwa kuchelewa zaidi ya siku 7.",
@@ -808,19 +814,20 @@ class RentalAgreementPDFGenerator:
             "7. Dhamana itarudishwa mwishoni mwa mkataba ikiwa hakuna uharibifu.",
             "8. Mkodishwa hawezi kuuza au kukodisha shamba kwa mtu mwingine bila idhini.",
             "9. Kodi inaweza kuongezwa kwa 10% kila mwaka baada ya miaka miwili.",
-            "10. Mkataba huu unaongozwa na sheria za Tanzania."
         ]
         
+        # Create a compact list with smaller spacing
         for term in terms:
-            self.story.append(Paragraph(term, self.normal_style))
+            p = Paragraph(term, self.normal_style)
+            self.story.append(p)
         
-        self.story.append(Spacer(1, 0.5*cm))
+        self.story.append(Spacer(1, 0.3*cm)) 
 
     def add_signatures(self):
-        """Add signature section"""
+        """Add signature section with compact layout"""
         self.story.append(Paragraph("SAHIHI NA MASHAHIDI", self.heading_style))
         
-        # Signature table
+        # More compact signature table
         signature_data = [
             [
                 Paragraph("<b>MKODISHAJI:</b>", self.normal_style),
@@ -834,7 +841,7 @@ class RentalAgreementPDFGenerator:
                 Paragraph(f"Tarehe: {self.format_date(datetime.now())}", self.normal_style),
                 Paragraph("Tarehe: __________________", self.normal_style)
             ],
-            ["", ""],  # Space
+            ["", ""],  # Minimal space
             [
                 Paragraph("<b>MDHAMINI 1:</b>", self.normal_style),
                 Paragraph("<b>MDHAMINI 2:</b>", self.normal_style)
@@ -852,18 +859,19 @@ class RentalAgreementPDFGenerator:
         signature_table = Table(signature_data, colWidths=[8.5*cm, 8.5*cm])
         signature_table.setStyle(TableStyle([
             ('VALIGN', (0, 0), (-1, -1), 'TOP'),
-            ('LEFTPADDING', (0, 0), (-1, -1), 6),
-            ('RIGHTPADDING', (0, 0), (-1, -1), 6),
+            ('LEFTPADDING', (0, 0), (-1, -1), 4),  
+            ('RIGHTPADDING', (0, 0), (-1, -1), 4),
             ('LINEBELOW', (0, 1), (-1, 1), 1, colors.black),
             ('LINEBELOW', (0, 5), (-1, 5), 1, colors.black),
             ('LINEBELOW', (0, 6), (-1, 6), 1, colors.black),
+            ('FONTSIZE', (0, 0), (-1, -1), 8),    
         ]))
         
         self.story.append(signature_table)
 
     def add_footer(self):
-        """Add footer"""
-        self.story.append(Spacer(1, 1*cm))
+        """Add compact footer"""
+        self.story.append(Spacer(1, 0.5*cm)) 
         footer_text = (
             "Mkataba huu umejumuishwa chini ya sheria za Tanzania. "
             "Kwa maswali, wasiliana na msimamizi wa mfumo."
@@ -1022,6 +1030,402 @@ class DownloadRentalAgreementView(View):
             
         except Exception as e:
             logger.error(f"Error downloading PDF: {str(e)}")
+            return JsonResponse({
+                'error': f'Error generating PDF: {str(e)}'
+            }, status=500)
+        
+# view for pdfgenerating for purchase agreement
+class PurchaseAgreementPDFGenerator:
+    def __init__(self, agreement_data):
+        self.data = agreement_data
+        self.buffer = BytesIO()
+        self.doc = SimpleDocTemplate(
+            self.buffer,
+            pagesize=A4,
+            rightMargin=1.5*cm,  # Reduced margins
+            leftMargin=1.5*cm,
+            topMargin=1.5*cm,
+            bottomMargin=1.5*cm
+        )
+        self.styles = getSampleStyleSheet()
+        self.story = []
+        
+        # Custom styles with smaller fonts and spacing
+        self.title_style = ParagraphStyle(
+            'CustomTitle',
+            parent=self.styles['Heading1'],
+            fontSize=14,  # Reduced from 16
+            spaceAfter=6,  # Reduced from 12
+            alignment=TA_CENTER,
+            textColor=colors.darkgreen
+        )
+        
+        self.heading_style = ParagraphStyle(
+            'CustomHeading',
+            parent=self.styles['Heading2'],
+            fontSize=10,  # Reduced from 12
+            spaceAfter=4,  # Reduced from 8
+            textColor=colors.darkblue
+        )
+        
+        self.normal_style = ParagraphStyle(
+            'CustomNormal',
+            parent=self.styles['Normal'],
+            fontSize=8,  # Reduced from 10
+            spaceAfter=4,  # Reduced from 6
+            leading=10    # Reduced line spacing
+        )
+
+    def add_header(self):
+        """Add document header with compact spacing"""
+        header_data = [
+            [Paragraph("JAMHURI YA MUUNGANO WA TANZANIA", self.title_style)],
+            [Paragraph("MKATABA WA KUNUNUA SHAMBA", self.title_style)],
+            [Paragraph("(Farm Purchase Agreement)", self.normal_style)],
+            [Paragraph(f"Namba ya Shamba: {self.data.get('farm_number', 'N/A')}", self.normal_style)],
+            [Paragraph(f"Tarehe: {self.format_date(self.data.get('agreement_date'))}", self.normal_style)]
+        ]
+        
+        header_table = Table(header_data, colWidths=[17*cm])
+        header_table.setStyle(TableStyle([
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 4),  # Reduced padding
+        ]))
+        
+        self.story.append(header_table)
+        self.story.append(Spacer(1, 0.3*cm))  # Reduced spacer
+
+    def add_parties_section(self):
+        """Add parties information with compact layout"""
+        self.story.append(Paragraph("WAHUSIKA WA MKATABA", self.heading_style))
+        
+        # Parties table with tighter layout
+        parties_data = [
+            [
+                Paragraph("<b>MUUZAJI (SELLER)</b>", self.normal_style),
+                Paragraph("<b>MNUNUZI (BUYER)</b>", self.normal_style)
+            ],
+            [
+                Paragraph(f"<b>Jina:</b> {self.data.get('landlord_name', 'N/A')}", self.normal_style),
+                Paragraph(f"<b>Jina:</b> {self.data.get('full_name', 'N/A')}", self.normal_style)
+            ],
+            [
+                Paragraph(f"<b>Simu:</b> {self.data.get('landlord_phone', 'N/A')}", self.normal_style),
+                Paragraph(f"<b>Simu:</b> {self.data.get('contact_info', 'N/A')}", self.normal_style)
+            ],
+            [
+                Paragraph(f"<b>Barua Pepe:</b> {self.data.get('landlord_email', 'N/A')}", self.normal_style),
+                Paragraph(f"<b>Barua Pepe:</b> {self.data.get('buyer_email', 'N/A')}", self.normal_style)
+            ],
+            [
+                Paragraph(f"<b>Makazi:</b> {self.data.get('landlord_residence', 'N/A')}", self.normal_style),
+                Paragraph(f"<b>Makazi:</b> {self.data.get('address', 'N/A')}", self.normal_style)
+            ],
+        ]
+        
+        parties_table = Table(parties_data, colWidths=[8.5*cm, 8.5*cm])
+        parties_table.setStyle(TableStyle([
+            ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+            ('LEFTPADDING', (0, 0), (-1, -1), 4),  # Reduced padding
+            ('RIGHTPADDING', (0, 0), (-1, -1), 4),
+            ('GRID', (0, 0), (-1, -1), 1, colors.lightgrey),
+            ('FONTSIZE', (0, 0), (-1, -1), 8),    # Smaller font for table
+        ]))
+        
+        self.story.append(parties_table)
+        self.story.append(Spacer(1, 0.3*cm))  # Reduced spacer
+
+    def add_property_details(self):
+        """Add property details section with compact layout"""
+        self.story.append(Paragraph("MAELEZO YA SHAMBA", self.heading_style))
+        
+        property_data = [
+            [
+                Paragraph(f"<b>Eneo:</b> {self.data.get('location', 'N/A')}", self.normal_style),
+                Paragraph(f"<b>Ukubwa:</b> {self.data.get('size', 'N/A')} Ekari", self.normal_style)
+            ],
+            [
+                Paragraph(f"<b>Udongo:</b> {self.data.get('quality', 'N/A')}", self.normal_style),
+                Paragraph(f"<b>Aina:</b> {self.data.get('farm_type', 'N/A')}", self.normal_style)
+            ],
+            [
+                Paragraph(f"<b>Kusudi la Matumizi:</b> {self.data.get('intended_use', 'N/A')}", self.normal_style),
+                Paragraph(f"<b>Maelezo Ziada:</b> {self.data.get('description')}", self.normal_style),
+            ]
+        ]
+        
+        
+        property_table = Table(property_data, colWidths=[8.5*cm, 8.5*cm])
+        property_table.setStyle(TableStyle([
+            ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+            ('LEFTPADDING', (0, 0), (-1, -1), 4),  # Reduced padding
+            ('RIGHTPADDING', (0, 0), (-1, -1), 4),
+            ('GRID', (0, 0), (-1, -1), 1, colors.lightgrey),
+            ('FONTSIZE', (0, 0), (-1, -1), 8),      # Smaller font for table
+        ]))
+        
+        self.story.append(property_table)
+        self.story.append(Spacer(1, 0.3*cm))  
+
+    def add_financial_terms(self):
+        """Add financial terms section with compact layout"""
+        self.story.append(Paragraph("MASHARTI YA KIFEDHA", self.heading_style))
+        
+        price = float(self.data.get('price', 0))
+        
+        financial_data = [
+            [
+                Paragraph(f"<b>Bei ya Shamba:</b><br/>TZS {price:,.0f}", self.normal_style),
+                Paragraph("<b>Njia ya Malipo:</b><br/>Cash", self.normal_style),
+                Paragraph("<b>Tarehe ya Malipo:</b><br/>_________________", self.normal_style)
+            ]
+        ]
+        
+        financial_table = Table(financial_data, colWidths=[5.67*cm, 5.67*cm, 5.67*cm])
+        financial_table.setStyle(TableStyle([
+            ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('LEFTPADDING', (0, 0), (-1, -1), 4),  
+            ('RIGHTPADDING', (0, 0), (-1, -1), 4),
+            ('GRID', (0, 0), (-1, -1), 1, colors.lightgrey),
+            ('BACKGROUND', (0, 0), (-1, -1), colors.lightblue),
+            ('FONTSIZE', (0, 0), (-1, -1), 8),     
+        ]))
+        
+        self.story.append(financial_table)
+        self.story.append(Spacer(1, 0.3*cm))  
+
+    def add_terms_and_conditions(self):
+        """Add terms and conditions with compact layout"""
+        self.story.append(Paragraph("MASHARTI NA HALI ZA MKATABA", self.heading_style))
+        
+        # Purchase agreement specific terms
+        terms = [
+            "1. Muuzaji anakubali kumuuza mnunuzi shamba kwa bei iliyokubaliwa.",
+            "2. Mnunuzi atalipa kwa ujumla bei ya shamba kabla ya kukabidhiwa hati miliki.",
+            "3. Hati miliki itahamishwa kwa jina la mnunuzi ndani ya siku 30 baada ya malipo.",
+            "4. Mkataba huu hautaweza kufutwa isipokuwa kwa makubaliano ya pande zote mbili.",
+            "5. Migogoro yoyote itatupiliwa mbele ya mahakama za Tanzania kwa uamuzi.",
+            "6. Gharama zote za uhamisho wa hati miliki zitakuwa mzigo wa mnunuzi.",
+            "7. Muuzaji atahakikisha kuwa shamba halina madeni au madai yoyote kabla ya mauzo.",
+            "8. Mnunuzi anaweza kutumia shamba kwa kusudi lolote la kisheria.",
+        ]
+        
+        # Create a compact list with smaller spacing
+        for term in terms:
+            p = Paragraph(term, self.normal_style)
+            self.story.append(p)
+        
+        self.story.append(Spacer(1, 0.3*cm)) 
+
+    def add_signatures(self):
+        """Add signature section with compact layout"""
+        self.story.append(Paragraph("SAHIHI NA MASHAHIDI", self.heading_style))
+        
+        # Purchase agreement signature section
+        signature_data = [
+            [
+                Paragraph("<b>MUUZAJI:</b>", self.normal_style),
+                Paragraph("<b>MNUNUZI:</b>", self.normal_style)
+            ],
+            [
+                Paragraph("Sahihi: _________________________", self.normal_style),
+                Paragraph("Sahihi: _________________________", self.normal_style)
+            ],
+            [
+                Paragraph(f"Tarehe: {self.format_date(datetime.now())}", self.normal_style),
+                Paragraph("Tarehe: __________________", self.normal_style)
+            ],
+            ["", ""],  # Minimal space
+            [
+                Paragraph("<b>SHAHIDI 1:</b>", self.normal_style),
+                Paragraph("<b>SHAHIDI 2:</b>", self.normal_style)
+            ],
+            [
+                Paragraph("Jina: _________________________", self.normal_style),
+                Paragraph("Jina: _________________________", self.normal_style)
+            ],
+            [
+                Paragraph("Sahihi: _________________________", self.normal_style),
+                Paragraph("Sahihi: _________________________", self.normal_style)
+            ]
+        ]
+        
+        signature_table = Table(signature_data, colWidths=[8.5*cm, 8.5*cm])
+        signature_table.setStyle(TableStyle([
+            ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+            ('LEFTPADDING', (0, 0), (-1, -1), 4),  
+            ('RIGHTPADDING', (0, 0), (-1, -1), 4),
+            ('LINEBELOW', (0, 1), (-1, 1), 1, colors.black),
+            ('LINEBELOW', (0, 5), (-1, 5), 1, colors.black),
+            ('LINEBELOW', (0, 6), (-1, 6), 1, colors.black),
+            ('FONTSIZE', (0, 0), (-1, -1), 8),    
+        ]))
+        
+        self.story.append(signature_table)
+
+    def add_footer(self):
+        """Add compact footer"""
+        self.story.append(Spacer(1, 0.5*cm)) 
+        footer_text = (
+            "Mkataba huu wa ununuzi wa shamba umeandaliwa kwa mujibu wa sheria za Tanzania. "
+            "Nakala hii ni halali kwa matumizi yote ya kisheria."
+        )
+        self.story.append(Paragraph(footer_text, self.normal_style))
+
+    def format_date(self, date_input):
+        """Format date to DD/MM/YYYY"""
+        if not date_input:
+            return datetime.now().strftime("%d/%m/%Y")
+        
+        if isinstance(date_input, str):
+            try:
+                date_obj = datetime.fromisoformat(date_input.replace('Z', '+00:00'))
+                return date_obj.strftime("%d/%m/%Y")
+            except:
+                return date_input
+        elif isinstance(date_input, datetime):
+            return date_input.strftime("%d/%m/%Y")
+        
+        return str(date_input)
+
+    def generate_pdf(self):
+        """Generate the complete PDF"""
+        try:
+            self.add_header()
+            self.add_parties_section()
+            self.add_property_details()
+            self.add_financial_terms()
+            self.add_terms_and_conditions()
+            self.add_signatures()
+            self.add_footer()
+            
+            self.doc.build(self.story)
+            self.buffer.seek(0)
+            return self.buffer
+        except Exception as e:
+            logger.error(f"Error generating PDF: {str(e)}")
+            raise
+
+# view to create a purchase agreement
+@method_decorator(csrf_exempt, name='dispatch')
+class CreatePurchaseAgreementView(View):
+    def post(self, request):
+        try:
+            data = json.loads(request.body)
+            logger.info(f"Creating purchase agreement with data: {data}")
+            
+            # Validate required fields
+            required_fields = [
+                'location', 'size', 'quality', 'price', 'full_name',
+                'contact_info', 'buyer_email', 'address'
+            ]
+            
+            missing_fields = [field for field in required_fields if not data.get(field)]
+            if missing_fields:
+                return JsonResponse({
+                    'success': False,
+                    'error': f'Missing required fields: {", ".join(missing_fields)}'
+                }, status=400)
+            
+            # Create purchase agreement record
+            agreement = PurchaseAgreement.objects.create(
+                farm_id=data.get('farm_id'),
+                transaction_id=data.get('transaction_id'),
+                farm_number=data.get('farm_number'),
+                location=data.get('location'),
+                size=float(data.get('size')),
+                quality=data.get('quality'),
+                farm_type=data.get('farm_type', ''),
+                description=data.get('description', ''),
+                purpose=data.get('purpose', ''),
+                price=float(data.get('price')),
+                full_name=data.get('full_name'),
+                contact_info=data.get('contact_info'),
+                buyer_email=data.get('buyer_email'),
+                address=data.get('address'),
+                landlord_name=data.get('landlord_name', ''),
+                landlord_phone=data.get('landlord_phone', ''),
+                landlord_email=data.get('landlord_email', ''),
+                landlord_residence=data.get('landlord_residence', ''),
+                landlord_passport=data.get('landlord_passport', ''),
+                status='pending'
+            )
+            
+            logger.info(f"Purchase agreement created successfully with ID: {agreement.id}")
+            
+            return JsonResponse({
+                'success': True,
+                'message': 'Purchase agreement created successfully',
+                'agreement_id': agreement.id
+            })
+            
+        except json.JSONDecodeError:
+            return JsonResponse({
+                'success': False,
+                'error': 'Invalid JSON data'
+            }, status=400)
+        except Exception as e:
+            logger.error(f"Error creating purchase agreement: {str(e)}")
+            return JsonResponse({
+                'success': False,
+                'error': str(e)
+            }, status=500)
+
+# view to download the purchase agreement as a PDF
+@method_decorator(csrf_exempt, name='dispatch')  
+class DownloadPurchaseAgreementView(View):
+    def get(self, request, pk):  
+        try:
+            logger.info(f"Downloading PDF for purchase agreement ID: {pk}")
+            
+            # Get agreement from database
+            try:
+                agreement = PurchaseAgreement.objects.get(id=pk)  
+            except PurchaseAgreement.DoesNotExist:
+                return JsonResponse({
+                    'error': 'Purchase agreement not found'
+                }, status=404)
+            
+            # Prepare agreement data for PDF generation
+            agreement_data = {
+                'farm_number': agreement.farm_number,
+                'transaction_id': agreement.transaction_id,
+                'location': agreement.location,
+                'size': agreement.size,
+                'quality': agreement.quality,
+                'farm_type': agreement.farm_type,
+                'description': agreement.description,
+                'purpose': agreement.purpose,
+                'price': agreement.price,
+                'full_name': agreement.full_name,
+                'contact_info': agreement.contact_info,
+                'buyer_email': agreement.buyer_email,
+                'address': agreement.address,
+                'landlord_name': agreement.landlord_name,
+                'landlord_phone': agreement.landlord_phone,
+                'landlord_email': agreement.landlord_email,
+                'landlord_residence': agreement.landlord_residence,
+                'landlord_passport': agreement.landlord_passport,
+                'farm_id': agreement.farm_id,
+            }
+            
+            pdf_generator = PurchaseAgreementPDFGenerator(agreement_data)
+            pdf_buffer = pdf_generator.generate_pdf()
+            
+            response = HttpResponse(
+                pdf_buffer.getvalue(),
+                content_type='application/pdf'
+            )
+            response['Content-Disposition'] = f'attachment; filename="Mkataba_wa_Kununua_Shamba_{pk}.pdf"'
+            response['Content-Length'] = len(pdf_buffer.getvalue())
+            
+            logger.info(f"Purchase agreement PDF generated successfully. Size: {len(pdf_buffer.getvalue())} bytes")
+            return response
+            
+        except Exception as e:
+            logger.error(f"Error downloading purchase agreement PDF: {str(e)}")
             return JsonResponse({
                 'error': f'Error generating PDF: {str(e)}'
             }, status=500)

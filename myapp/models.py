@@ -210,9 +210,10 @@ class PurchaseAgreement(models.Model):
     description = models.TextField(blank=True)
     price = models.FloatField()
     full_name = models.CharField(max_length=100)
-    renter_phone = models.CharField(max_length=20)
-    renter_email = models.EmailField()
-    residence = models.CharField(max_length=100)
+    contact_info = models.CharField(max_length=20)
+    buyer_email = models.EmailField()
+    purpose = models.CharField(max_length=100, blank=True)
+    address = models.CharField(max_length=100)
     landlord_name = models.CharField(max_length=100, blank=True)
     landlord_phone = models.CharField(max_length=20, blank=True)
     landlord_email = models.EmailField(blank=True)
@@ -222,8 +223,6 @@ class PurchaseAgreement(models.Model):
     # Add the missing fields
     farm_id = models.CharField(max_length=50, blank=True, null=True)
     transaction_id = models.CharField(max_length=100, blank=True, null=True)
-    # agreement_date = models.DateField(default=datetime.now)  # Auto-sets to today
-    duration_months = models.IntegerField(default=12)  # Default 1 year
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='active')
 
     def __str__(self):

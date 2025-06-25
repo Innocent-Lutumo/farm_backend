@@ -42,6 +42,8 @@ urlpatterns = [
     path('all-farms/<str:farm_type>/<int:farm_id>/', FarmDetailView.as_view(), name='farm_detail'),
     path('create-rental-agreement/', CreateRentalAgreementView.as_view(), name='create_rental_agreement'),
     path('download-rental-agreement/<int:pk>/', DownloadRentalAgreementView.as_view(), name='download_rental_agreement'),
+     path('create-purchase-agreement/', CreatePurchaseAgreementView.as_view(), name='create_purchase_agreement'),
+    path('download-purchase-agreement/<int:pk>/', DownloadPurchaseAgreementView.as_view(), name='download_purchase_agreement'),
     path("", include(router.urls)),
 ]
 
