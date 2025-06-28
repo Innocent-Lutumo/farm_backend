@@ -213,8 +213,10 @@ DJOSER = {
     'LOGIN_FIELD': 'username',
     'SEND_ACTIVATION_EMAIL': True, 
     'PASSWORD_RESET_CONFIRM_URL': 'password-reset/{uid}/{token}', 
-    'USERNAME_RESET_CONFIRM_URL': 'username-reset/{uid}/{token}', 
+    'USERNAME_RESET_CONFIRM_URL': 'password-reset/{uid}/{token}', 
     'ACTIVATION_URL': 'activation/{uid}/{token}', 
+    'DOMAIN': 'localhost:3000',
+    'SITE_NAME': 'Farm Finder',
     
     # Custom serializers if you extend Djoser's default user serializers
     'SERIALIZERS': {

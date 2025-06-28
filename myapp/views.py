@@ -32,6 +32,7 @@ from reportlab.lib.enums import TA_CENTER
 from datetime import datetime
 from reportlab.lib.styles import getSampleStyleSheet
 import logging
+import jwt  # Import the jwt module for decoding tokens
 
 from .utils import verify_google_token
 from .serializers import (
@@ -61,6 +62,112 @@ logger.setLevel(logging.INFO)
 # token generation view for sellers
 class CustomTokenObtainPairView(TokenObtainPairView):
     serializer_class = CustomTokenObtainPairSerializer
+
+# view for token validation
+User = get_user_model()
+
+@api_view(['POST'])
+@permission_classes([AllowAny]) # Keep this as AllowAny because the check for seller group is inside the view logic
+def validate_token(request):
+    try:
+        auth_header = request.META.get('HTTP_AUTHORIZATION')
+
+        if not auth_header or not auth_header.startswith('Bearer '):
+            return Response(
+                {'isValid': False, 'error': 'No token provided or invalid format'},
+                status=status.HTTP_401_UNAUTHORIZED
+            )
+
+        token = auth_header.split(' ')[1]
+
+        # Decode JWT token
+        try:
+            payload = jwt.decode(token, settings.SECRET_KEY, algorithms=['HS256'])
+        except jwt.ExpiredSignatureError:
+            return Response(
+                {'isValid': False, 'error': 'Token expired'},
+                status=status.HTTP_401_UNAUTHORIZED
+            )
+        except jwt.InvalidTokenError:
+            return Response(
+                {'isValid': False, 'error': 'Invalid token'},
+                status=status.HTTP_401_UNAUTHORIZED
+            )
+
+        # Get user from token
+        try:
+            user = User.objects.get(id=payload['user_id'])
+        except User.DoesNotExist:
+            return Response(
+                {'isValid': False, 'error': 'User not found'},
+                status=status.HTTP_401_UNAUTHORIZED
+            )
+
+        # Check if user is active
+        if not user.is_active:
+            return Response(
+                {'isValid': False, 'error': 'Account deactivated'},
+                status=status.HTTP_401_UNAUTHORIZED
+            )
+
+        # --- NEW LOGIC FOR GROUP CHECK ---
+        try:
+            seller_group = Group.objects.get(name='Seller')
+            if not user.groups.filter(name='Seller').exists():
+                return Response(
+                    {'isValid': False, 'error': 'Unauthorized: Not a Seller user'},
+                    status=status.HTTP_403_FORBIDDEN # Use 403 Forbidden for authorization issues
+                )
+        except Group.DoesNotExist:
+            # Handle case where 'Seller' group doesn't exist in the database
+            # This might happen if your groups aren't set up yet, or there's a typo.
+            # In production, you might want to log this as a server configuration error.
+            return Response(
+                {'isValid': False, 'error': 'Server configuration error: Seller group not found'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+        # --- END NEW LOGIC ---
+
+        # If all checks pass, the token is valid AND the user is a Seller
+        return Response(
+            {'isValid': True,
+             'user': { # Optionally, return some user data if validation implies access
+                 'id': user.id,
+                 'username': user.username,
+                 'is_seller': True # Explicitly indicate role on the frontend
+             },
+             'expiresAt': datetime.fromtimestamp(payload['exp']).isoformat() # Restore this if needed
+            },
+            status=status.HTTP_200_OK
+        )
+
+    except Exception as e:
+        print(f"Token validation general error: {e}")
+        return Response(
+            {'isValid': False, 'error': 'Internal server error'},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+        # Token is valid
+        # Return relevant user details (customize as needed)
+        # Note: 'name' and 'role' are example fields. Use existing fields like first_name, last_name, etc.
+        user_data = {
+            'id': user.id,
+            'username': user.username, 
+        }
+
+        return Response({
+            'isValid': True, # Changed from 'valid' to 'isValid' to match frontend expected key
+            'user': user_data,
+            'expiresAt': datetime.fromtimestamp(payload['exp']).isoformat()
+        })
+
+    except Exception as e:
+        # Log the exception for debugging purposes
+        print(f"Token validation general error: {e}")
+        return Response(
+            {'error': 'Internal server error'},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
 
 # view to get the list of all sellers
 User = get_user_model()

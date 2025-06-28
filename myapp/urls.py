@@ -18,6 +18,7 @@ urlpatterns = [
     path('admin-sellers/', get_sellers, name='get_sellers'),
     path('admin-sellers-list/', get_sellers_unprotected, name='get_sellers_unprotected'),
     path('admin-sellers/<int:pk>/', views.seller_detail, name='seller_detail'),
+    path('validate-token/', views.validate_token, name='validate_token'),
     path('UploadFarm/', UploadFarmAPIView.as_view(), name='Upload_farm'),
     path('token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
     path("login/", CustomTokenObtainPairView.as_view(), name="custom_login"),
