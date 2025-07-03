@@ -51,9 +51,9 @@ class FarmSaleSerializer(serializers.ModelSerializer):
 
     def validate_passport(self, value):
         if not value:
-            return value  # Skip if optional and not provided
+            return value  
 
-        max_size = 3 * 1024 * 1024  # 3MB
+        max_size = 3 * 1024 * 1024
         valid_mime_types = ['image/jpeg', 'image/png']
         valid_extensions = ['.jpg', '.jpeg', '.png']
 
@@ -91,8 +91,8 @@ class FarmSaleSerializer(serializers.ModelSerializer):
 
     # Validate farm number format (e.g., 45-sinza)
     def validate_farm_number(self, value):
-        if not re.match(r'^\d+-[a-zA-Z]+$', value):
-            raise serializers.ValidationError("Farm number must be in the format '45-sinza'.")
+        if not re.match(r'^[a-zA-Z]+\d+$', value):
+            raise serializers.ValidationError("Farm number must be in the format 'P4323'.")
         return value
     
 class FarmRentSerializer(serializers.ModelSerializer):
